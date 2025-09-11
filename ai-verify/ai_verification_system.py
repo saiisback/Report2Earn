@@ -162,24 +162,26 @@ Images: {state.content_images if state.content_images else "None"}
 Analyze this content and respond with ONLY the JSON format specified above.""")
         ])
         
-        # Run verification with models sequentially to avoid hanging
+        # Run verification with models in parallel for better performance
         model_names = list(self.models.keys())
-        results = []
         
         print(f"🤖 Starting verification with {len(model_names)} models: {model_names}")
         
-        for i, (model_name, client) in enumerate(self.models.items()):
-            print(f"🚀 Processing model {i+1}/{len(model_names)}: {model_name}")
+        # Create tasks for all models
+        tasks = []
+        for model_name, client in self.models.items():
+            task = asyncio.create_task(
+                self._verify_with_model_safe(client, model_name, prompt, state)
+            )
+            tasks.append((model_name, task))
+        
+        # Wait for all tasks to complete
+        results = []
+        for model_name, task in tasks:
             try:
-                result = await asyncio.wait_for(
-                    self._verify_with_model(client, model_name, prompt, state),
-                    timeout=30  # 30 second timeout per model
-                )
+                result = await task
                 results.append(result)
                 print(f"✅ Model {model_name} completed successfully")
-            except asyncio.TimeoutError:
-                print(f"⏰ Model {model_name} timed out, skipping")
-                results.append(self._create_fallback_decision(model_name, "Timeout"))
             except Exception as e:
                 print(f"❌ Model {model_name} failed: {e}")
                 results.append(self._create_fallback_decision(model_name, str(e)))
@@ -233,6 +235,21 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
         
         return state
     
+    async def _verify_with_model_safe(self, client, model_name, prompt, state):
+        """Safely verify content with a specific model, handling timeouts and errors"""
+        try:
+            result = await asyncio.wait_for(
+                self._verify_with_model(client, model_name, prompt, state),
+                timeout=45  # 45 second timeout per model
+            )
+            return result
+        except asyncio.TimeoutError:
+            print(f"⏰ Model {model_name} timed out, creating fallback")
+            return self._create_fallback_decision(model_name, "Timeout")
+        except Exception as e:
+            print(f"❌ Model {model_name} failed: {e}")
+            return self._create_fallback_decision(model_name, str(e))
+
     async def _verify_with_model(self, client, model_name, prompt, state):
         """Verify content with a specific model"""
         print(f"🔄 Calling model: {model_name}")
@@ -361,36 +378,100 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
             state.verification_complete = True
             return state
         
-        # Calculate consensus
-        authentic_count = sum(1 for d in valid_decisions if d.decision == VerificationResult.AUTHENTIC)
-        fake_count = sum(1 for d in valid_decisions if d.decision == VerificationResult.FAKE)
-        uncertain_count = sum(1 for d in valid_decisions if d.decision == VerificationResult.UNCERTAIN)
+        # Filter out failed/timeout decisions for consensus calculation
+        successful_decisions = [d for d in valid_decisions if d.confidence > 0.0 and "failed" not in d.reasoning.lower() and "timeout" not in d.reasoning.lower()]
+        failed_decisions = [d for d in valid_decisions if d not in successful_decisions]
         
-        print(f"📊 Decision counts - Authentic: {authentic_count}, Fake: {fake_count}, Uncertain: {uncertain_count}")
+        print(f"✅ Successful decisions: {len(successful_decisions)}")
+        print(f"❌ Failed decisions: {len(failed_decisions)}")
         
-        total_decisions = len(valid_decisions)
-        consensus_score = max(authentic_count, fake_count) / total_decisions
-        print(f"🎯 Consensus score: {consensus_score:.2f}")
+        # Require minimum number of successful models for reliable consensus
+        min_models = 2
+        if len(successful_decisions) < min_models:
+            print(f"⚠️ Insufficient successful models ({len(successful_decisions)} < {min_models}), defaulting to uncertain")
+            state.group_decision = GroupDecision(
+                final_decision=VerificationResult.UNCERTAIN,
+                confidence=0.0,
+                consensus_score=0.0,
+                individual_decisions=valid_decisions,
+                group_reasoning=f"Insufficient successful model responses ({len(successful_decisions)}/{len(valid_decisions)}). Need at least {min_models} successful models for reliable consensus."
+            )
+            state.verification_complete = True
+            return state
         
-        # Determine final decision with weighted voting
-        if authentic_count > fake_count and authentic_count > uncertain_count:
-            final_decision = VerificationResult.AUTHENTIC
-            print(f"🏆 Final decision: AUTHENTIC (majority: {authentic_count})")
+        # Calculate consensus using only successful decisions
+        authentic_count = sum(1 for d in successful_decisions if d.decision == VerificationResult.AUTHENTIC)
+        fake_count = sum(1 for d in successful_decisions if d.decision == VerificationResult.FAKE)
+        uncertain_count = sum(1 for d in successful_decisions if d.decision == VerificationResult.UNCERTAIN)
+        
+        print(f"📊 Successful decision counts - Authentic: {authentic_count}, Fake: {fake_count}, Uncertain: {uncertain_count}")
+        
+        # Calculate confidence-weighted scores
+        authentic_weighted = sum(d.confidence for d in successful_decisions if d.decision == VerificationResult.AUTHENTIC)
+        fake_weighted = sum(d.confidence for d in successful_decisions if d.decision == VerificationResult.FAKE)
+        uncertain_weighted = sum(d.confidence for d in successful_decisions if d.decision == VerificationResult.UNCERTAIN)
+        
+        print(f"⚖️ Weighted scores - Authentic: {authentic_weighted:.2f}, Fake: {fake_weighted:.2f}, Uncertain: {uncertain_weighted:.2f}")
+        
+        # Determine final decision using both count and confidence weighting
+        total_successful = len(successful_decisions)
+        consensus_score = max(authentic_count, fake_count) / total_successful
+        
+        # Use confidence-weighted voting as primary method
+        # Add minimum confidence threshold for reliable decisions
+        min_confidence_threshold = 0.6
+        
+        if fake_weighted > authentic_weighted and fake_weighted > uncertain_weighted:
+            # Check if we have high-confidence fake decisions
+            high_conf_fake = [d for d in successful_decisions if d.decision == VerificationResult.FAKE and d.confidence >= min_confidence_threshold]
+            if high_conf_fake:
+                final_decision = VerificationResult.FAKE
+                print(f"🏆 Final decision: FAKE (weighted: {fake_weighted:.2f}, count: {fake_count}, high-conf: {len(high_conf_fake)})")
+            else:
+                final_decision = VerificationResult.UNCERTAIN
+                print(f"🏆 Final decision: UNCERTAIN (fake weighted: {fake_weighted:.2f} but low confidence)")
+        elif authentic_weighted > fake_weighted and authentic_weighted > uncertain_weighted:
+            # Check if we have high-confidence authentic decisions
+            high_conf_authentic = [d for d in successful_decisions if d.decision == VerificationResult.AUTHENTIC and d.confidence >= min_confidence_threshold]
+            if high_conf_authentic:
+                final_decision = VerificationResult.AUTHENTIC
+                print(f"🏆 Final decision: AUTHENTIC (weighted: {authentic_weighted:.2f}, count: {authentic_count}, high-conf: {len(high_conf_authentic)})")
+            else:
+                final_decision = VerificationResult.UNCERTAIN
+                print(f"🏆 Final decision: UNCERTAIN (authentic weighted: {authentic_weighted:.2f} but low confidence)")
         elif fake_count > authentic_count and fake_count > uncertain_count:
-            final_decision = VerificationResult.FAKE
-            print(f"🏆 Final decision: FAKE (majority: {fake_count})")
+            # Fallback to count-based voting
+            high_conf_fake = [d for d in successful_decisions if d.decision == VerificationResult.FAKE and d.confidence >= min_confidence_threshold]
+            if high_conf_fake:
+                final_decision = VerificationResult.FAKE
+                print(f"🏆 Final decision: FAKE (count majority: {fake_count}, high-conf: {len(high_conf_fake)})")
+            else:
+                final_decision = VerificationResult.UNCERTAIN
+                print(f"🏆 Final decision: UNCERTAIN (fake count: {fake_count} but low confidence)")
+        elif authentic_count > fake_count and authentic_count > uncertain_count:
+            # Fallback to count-based voting
+            high_conf_authentic = [d for d in successful_decisions if d.decision == VerificationResult.AUTHENTIC and d.confidence >= min_confidence_threshold]
+            if high_conf_authentic:
+                final_decision = VerificationResult.AUTHENTIC
+                print(f"🏆 Final decision: AUTHENTIC (count majority: {authentic_count}, high-conf: {len(high_conf_authentic)})")
+            else:
+                final_decision = VerificationResult.UNCERTAIN
+                print(f"🏆 Final decision: UNCERTAIN (authentic count: {authentic_count} but low confidence)")
         else:
             final_decision = VerificationResult.UNCERTAIN
             print(f"🏆 Final decision: UNCERTAIN (no clear majority)")
         
         # Calculate weighted average confidence based on decision alignment
-        aligned_decisions = [d for d in valid_decisions if d.decision == final_decision]
+        aligned_decisions = [d for d in successful_decisions if d.decision == final_decision]
         if aligned_decisions:
             avg_confidence = sum(d.confidence for d in aligned_decisions) / len(aligned_decisions)
             print(f"📈 Average confidence from aligned decisions: {avg_confidence:.2f} ({len(aligned_decisions)} models)")
         else:
-            avg_confidence = sum(d.confidence for d in valid_decisions) / len(valid_decisions)
-            print(f"📈 Average confidence from all decisions: {avg_confidence:.2f}")
+            # Fallback to average of all successful decisions
+            avg_confidence = sum(d.confidence for d in successful_decisions) / len(successful_decisions)
+            print(f"📈 Average confidence from all successful decisions: {avg_confidence:.2f}")
+        
+        print(f"🎯 Final consensus score: {consensus_score:.2f}")
         
         # Generate group reasoning
         group_reasoning = self._generate_group_reasoning(valid_decisions, final_decision)
@@ -413,12 +494,36 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
     def _generate_group_reasoning(self, decisions: List[AgentDecision], final_decision: VerificationResult) -> str:
         """Generate reasoning for the group decision"""
         
+        # Separate successful and failed decisions
+        successful_decisions = [d for d in decisions if d.confidence > 0.0 and "failed" not in d.reasoning.lower() and "timeout" not in d.reasoning.lower()]
+        failed_decisions = [d for d in decisions if d not in successful_decisions]
+        
         reasoning_parts = [f"Group Decision: {final_decision.value.upper()}"]
-        reasoning_parts.append(f"Consensus Score: {max(sum(1 for d in decisions if d.decision == VerificationResult.AUTHENTIC), sum(1 for d in decisions if d.decision == VerificationResult.FAKE)) / len(decisions):.2f}")
+        
+        # Add consensus information
+        if successful_decisions:
+            authentic_count = sum(1 for d in successful_decisions if d.decision == VerificationResult.AUTHENTIC)
+            fake_count = sum(1 for d in successful_decisions if d.decision == VerificationResult.FAKE)
+            uncertain_count = sum(1 for d in successful_decisions if d.decision == VerificationResult.UNCERTAIN)
+            
+            reasoning_parts.append(f"Consensus: {fake_count} fake, {authentic_count} authentic, {uncertain_count} uncertain")
+            reasoning_parts.append(f"Successful Models: {len(successful_decisions)}/{len(decisions)}")
+            
+            # Add confidence-weighted information
+            fake_weighted = sum(d.confidence for d in successful_decisions if d.decision == VerificationResult.FAKE)
+            authentic_weighted = sum(d.confidence for d in successful_decisions if d.decision == VerificationResult.AUTHENTIC)
+            reasoning_parts.append(f"Confidence Weighted: Fake {fake_weighted:.2f}, Authentic {authentic_weighted:.2f}")
+        
+        if failed_decisions:
+            reasoning_parts.append(f"\nFailed Models: {len(failed_decisions)}")
+            for decision in failed_decisions:
+                reasoning_parts.append(f"- {decision.agent_name}: {decision.reasoning}")
+        
         reasoning_parts.append("\nIndividual Agent Analysis:")
         
-        for decision in decisions:
-            reasoning_parts.append(f"\n{decision.agent_name}: {decision.decision.value.upper()} (confidence: {decision.confidence:.2f})")
+        for decision in successful_decisions:
+            status = "✅" if decision.decision == final_decision else "❌"
+            reasoning_parts.append(f"\n{status} {decision.agent_name}: {decision.decision.value.upper()} (confidence: {decision.confidence:.2f})")
             reasoning_parts.append(f"Reasoning: {decision.reasoning}")
             if decision.evidence:
                 reasoning_parts.append(f"Evidence: {', '.join(decision.evidence)}")
