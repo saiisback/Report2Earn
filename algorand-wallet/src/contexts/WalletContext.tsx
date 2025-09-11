@@ -39,6 +39,10 @@ const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =
       chainId: 416002, // Testnet
     });
 
+    console.log('PeraWallet object:', peraWalletConnect);
+    console.log('PeraWallet methods:', Object.getOwnPropertyNames(peraWalletConnect));
+    console.log('signTransaction method:', typeof peraWalletConnect.signTransaction);
+
     setPeraWallet(peraWalletConnect);
     console.log('Pera Wallet initialized');
 
@@ -126,9 +130,38 @@ const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =
     }
     
     try {
-      // Pera Wallet expects an array of transaction objects
-      const signedTxns = await peraWallet.signTransaction([txns[0]] as any);
-      return [signedTxns[0]];
+      console.log('Signing transaction with Pera Wallet...');
+      console.log('Transaction bytes length:', txns[0]?.length);
+      
+      // Check if signTransaction method exists
+      if (typeof peraWallet.signTransaction !== 'function') {
+        throw new Error('signTransaction method not available on PeraWallet');
+      }
+      
+      // Convert Uint8Array back to Transaction object for Pera Wallet
+      // We need to decode the transaction bytes back to a Transaction object
+      const algosdk = await import('algosdk');
+      const txn = algosdk.decodeUnsignedTransaction(txns[0]);
+      
+      console.log('Decoded transaction:', txn);
+      
+      // Pera Wallet Connect expects SignerTransaction[][] format
+      // Each group is an array of SignerTransaction objects
+      const transactionToSign = [[{
+        txn: txn,
+        message: 'Please sign this transaction'
+      }]];
+      
+      console.log('Sending transaction to Pera Wallet:', transactionToSign);
+      
+      const signedTxns = await peraWallet.signTransaction(transactionToSign);
+      
+      console.log('Transaction signed successfully');
+      console.log('Signed transaction type:', typeof signedTxns);
+      console.log('Signed transaction length:', signedTxns?.length);
+      
+      // The signed transactions are already Uint8Array[]
+      return signedTxns;
     } catch (error) {
       console.error('Failed to sign transactions:', error);
       throw error;
@@ -137,7 +170,9 @@ const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   const sendTransactions = async (signedTxns: Uint8Array[]): Promise<{ txId: string }> => {
     try {
+      console.log('Sending signed transaction to Algorand network...');
       const result = await algodClient.sendRawTransaction(signedTxns[0]).do();
+      console.log('Transaction submitted successfully:', result.txid);
       return { txId: result.txid };
     } catch (error) {
       console.error('Failed to send transactions:', error);

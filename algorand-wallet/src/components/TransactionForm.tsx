@@ -14,17 +14,6 @@ const TransactionForm: React.FC = () => {
   const [txId, setTxId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Debug logging
-  console.log('TransactionForm render:', { 
-    isConnected, 
-    address, 
-    addressType: typeof address,
-    addressLength: address?.length,
-    hasSignTransactions: !!signTransactions,
-    hasSendTransactions: !!sendTransactions 
-  });
-
-  // Safety check
   if (!walletContext) {
     return (
       <div className="bg-red-100 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
@@ -35,14 +24,11 @@ const TransactionForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log('Form submitted:', { isConnected, address, recipient, amount });
-    
+
     if (loading) {
-      console.log('Already processing, ignoring submission');
       return;
     }
-    
+
     if (!isConnected || !address) {
       setError('Please connect your wallet first');
       return;
@@ -58,6 +44,11 @@ const TransactionForm: React.FC = () => {
       return;
     }
 
+    if (!algosdk.isValidAddress(recipient)) {
+      setError('Invalid recipient address format');
+      return;
+    }
+
     const amountInMicroAlgos = algosToMicroAlgos(parseFloat(amount));
     if (amountInMicroAlgos <= 0) {
       setError('Amount must be greater than 0');
@@ -69,73 +60,42 @@ const TransactionForm: React.FC = () => {
       setError(null);
       setTxId(null);
 
-      console.log('Creating transaction with:', { address, recipient, amountInMicroAlgos });
-
-      // Validate recipient address
-      console.log('Validating recipient address:', recipient);
-      if (!algosdk.isValidAddress(recipient)) {
-        console.error('Invalid recipient address:', recipient);
-        setError('Invalid recipient address format');
-        return;
-      }
-      console.log('Recipient address is valid');
-
-      // Get suggested parameters
       const suggestedParams = await algodClient.getTransactionParams().do();
-      console.log('Suggested params:', suggestedParams);
 
-      // Create payment transaction using the correct method
-      console.log('Creating payment transaction...');
-      console.log('Address values:', { 
-        from: address, 
-        to: recipient, 
-        fromType: typeof address, 
-        toType: typeof recipient,
-        fromLength: address?.length,
-        toLength: recipient?.length
-      });
-      
-      // Validate addresses before creating transaction
-      if (!address || address.trim() === '') {
-        setError('Sender address is missing or invalid');
-        return;
-      }
-      
-      if (!recipient || recipient.trim() === '') {
-        setError('Recipient address is missing or invalid');
-        return;
-      }
-      
-      // Convert BigInt values to numbers and create a clean suggested params object
       const cleanSuggestedParams = {
         flatFee: suggestedParams.flatFee,
         fee: Number(suggestedParams.fee),
+        minFee: Number(suggestedParams.minFee),
         firstValid: Number(suggestedParams.firstValid),
         lastValid: Number(suggestedParams.lastValid),
         genesisID: suggestedParams.genesisID,
         genesisHash: suggestedParams.genesisHash,
       };
-      
-      console.log('About to call makePaymentTxnWithSuggestedParamsFromObject with params:', {
-        from: address.trim(),
-        to: recipient.trim(),
-        amount: amountInMicroAlgos,
-        suggestedParams: cleanSuggestedParams
-      });
-      
+
+      console.log('Creating transaction...');
+      // Use the correct method that exists in the SDK
       const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-        from: address.trim(),
-        to: recipient.trim(),
+        sender: address,
+        receiver: recipient,
         amount: amountInMicroAlgos,
         suggestedParams: cleanSuggestedParams,
       });
       console.log('Transaction created successfully');
+      console.log('Transaction object:', txn);
+      console.log('Transaction type:', typeof txn);
+      console.log('Transaction methods:', Object.getOwnPropertyNames(txn));
 
       // Sign transaction
-      const signedTxn = await signTransactions([txn.toByte()]);
+      console.log('Signing transaction...');
+      const txnBytes = txn.toByte();
+      console.log('Transaction bytes created, length:', txnBytes.length);
+      const signedTxn = await signTransactions([txnBytes]);
+      console.log('Transaction signed successfully');
 
       // Send transaction
+      console.log('Sending transaction to network...');
       const { txId: transactionId } = await sendTransactions(signedTxn);
+      console.log('Transaction sent successfully:', transactionId);
       
       setTxId(transactionId);
       setRecipient('');
@@ -219,6 +179,14 @@ const TransactionForm: React.FC = () => {
           <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
             <p className="font-medium">Transaction successful!</p>
             <p className="text-xs mt-1">Transaction ID: {txId}</p>
+            <a 
+              href={`https://testnet.algoexplorer.io/tx/${txId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:text-blue-800 underline mt-1 block"
+            >
+              View on Algorand Explorer →
+            </a>
           </div>
         )}
         
