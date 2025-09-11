@@ -119,8 +119,38 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    font-family: var(--font-instrument-serif), serif;
+  }
+  html {
+    font-family: var(--font-instrument-serif), serif;
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-instrument-serif), serif;
+  }
+  
+  /* Ensure all text elements use the serif font */
+  h1, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select, label, li, ul, ol, blockquote, pre, code {
+    font-family: var(--font-instrument-serif), serif;
+  }
+  
+  /* Override any component-specific font classes */
+  .font-sans {
+    font-family: var(--font-instrument-serif), serif !important;
+  }
+  
+  /* Ensure UI components use the serif font */
+  [class*="ui-"], [class*="shadcn-"], [class*="component-"] {
+    font-family: var(--font-instrument-serif), serif;
+  }
+  
+  /* Force serif font on all elements with !important */
+  *:not(.font-mono):not(code):not(pre) {
+    font-family: var(--font-instrument-serif), serif !important;
+  }
+  
+  /* Override any Tailwind font utilities */
+  .font-sans, .font-serif, .font-mono {
+    font-family: var(--font-instrument-serif), serif !important;
   }
 }

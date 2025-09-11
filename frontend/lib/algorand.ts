@@ -26,11 +26,30 @@ export const algosToMicroAlgos = (algos: number) => {
   return Math.round(algos * 1000000);
 };
 
+// Generate a test escrow account for development
+const generateTestEscrowAccount = () => {
+  try {
+    const account = algosdk.generateAccount();
+    return {
+      address: account.addr,
+      mnemonic: algosdk.secretKeyToMnemonic(account.sk)
+    };
+  } catch (error) {
+    console.error('Failed to generate test account:', error);
+    // Fallback to a known test account
+    return {
+      address: 'YOUR_VALID_ESCROW_ADDRESS_HERE',
+      mnemonic: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art'
+    };
+  }
+};
+
+const testEscrowAccount = generateTestEscrowAccount();
+
 // Verification escrow address (using a valid test address for now)
 // In production, this should be a smart contract address
-// For testing, use your own address or a valid test address
-export const VERIFICATION_ESCROW_ADDRESS = process.env.NEXT_PUBLIC_VERIFICATION_ESCROW || 'YOUR_VALID_ESCROW_ADDRESS_HERE';
+export const VERIFICATION_ESCROW_ADDRESS = process.env.NEXT_PUBLIC_VERIFICATION_ESCROW || testEscrowAccount.address;
 
 // Escrow account mnemonic for signing transactions (for testing only)
 // In production, this would be handled by a smart contract
-export const ESCROW_MNEMONIC = process.env.ESCROW_MNEMONIC || 'YOUR_ESCROW_MNEMONIC_HERE';
+export const ESCROW_MNEMONIC = process.env.ESCROW_MNEMONIC || testEscrowAccount.mnemonic;

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Instrument_Serif } from "next/font/google"
+import WalletConnection from "@/components/WalletConnection"
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -20,31 +21,37 @@ export function Navbar() {
           R2E
         </Link>
 
-        <div className={`${instrumentSerif.className} flex items-center space-x-8`}>
-          <Link
-            href="/"
-            className={`text-white/90 hover:text-white transition-colors ${
-              pathname === "/" ? "text-white font-medium" : ""
-            }`}
-          >
-            Home
-          </Link>
-          <Link
-            href="/verify"
-            className={`text-white/90 hover:text-white transition-colors ${
-              pathname === "/verify" ? "text-white font-medium" : ""
-            }`}
-          >
-            Verify
-          </Link>
-          <Link
-            href="/community"
-            className={`text-white/90 hover:text-white transition-colors ${
-              pathname === "/community" ? "text-white font-medium" : ""
-            }`}
-          >
-            Community
-          </Link>
+        <div className="flex items-center space-x-8">
+          <div className={`${instrumentSerif.className} flex items-center space-x-8`}>
+            <Link
+              href="/"
+              className={`text-white/90 hover:text-white transition-colors ${
+                pathname === "/" ? "text-white font-medium" : ""
+              }`}
+            >
+              Home
+            </Link>
+            <Link
+              href="/verify"
+              className={`text-white/90 hover:text-white transition-colors ${
+                pathname === "/verify" ? "text-white font-medium" : ""
+              }`}
+            >
+              Verify
+            </Link>
+            <Link
+              href="/community"
+              className={`text-white/90 hover:text-white transition-colors ${
+                pathname === "/community" ? "text-white font-medium" : ""
+              }`}
+            >
+              Community
+            </Link>
+          </div>
+          
+          <div className="pl-4 border-l border-white/20">
+            <WalletConnection />
+          </div>
         </div>
       </div>
     </nav>

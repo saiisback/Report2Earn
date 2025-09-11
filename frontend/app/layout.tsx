@@ -7,6 +7,7 @@ import { Instrument_Serif } from "next/font/google"
 import { Suspense } from "react"
 import "./globals.css"
 import { Navbar } from "@/components/navbar"
+import { WalletProvider } from "@/contexts/WalletContext"
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -29,10 +30,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${instrumentSerif.variable} antialiased`}>
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <Navbar />
-        <Suspense fallback={null}>{children}</Suspense>
-        <Analytics />
+      <body className={`${instrumentSerif.variable} antialiased`}>
+        <WalletProvider>
+          <Navbar />
+          <Suspense fallback={null}>{children}</Suspense>
+          <Analytics />
+        </WalletProvider>
       </body>
     </html>
   )
