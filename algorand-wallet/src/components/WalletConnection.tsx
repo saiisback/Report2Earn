@@ -28,6 +28,7 @@ const WalletConnection: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-600">Address</label>
             <p className="text-sm text-gray-800 font-mono">{formatAddress(address)}</p>
+            <p className="text-xs text-gray-500 mt-1">Full address: {address}</p>
           </div>
           
           {balance !== null && (
@@ -36,6 +37,11 @@ const WalletConnection: React.FC = () => {
               <p className="text-sm text-gray-800">{balance.toFixed(6)} ALGO</p>
             </div>
           )}
+          
+          <div className="text-xs text-gray-500">
+            <p>Connected: {isConnected ? 'Yes' : 'No'}</p>
+            <p>Address exists: {address ? 'Yes' : 'No'}</p>
+          </div>
           
           <button
             onClick={disconnect}

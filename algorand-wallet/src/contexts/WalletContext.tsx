@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { UseWalletProvider, useWallet } from '@txnlab/use-wallet-react';
+import { PeraWalletConnect } from '@perawallet/connect';
 import { algodClient, formatAddress, microAlgosToAlgos } from '@/lib/algorand';
 
 interface WalletContextType {
@@ -11,6 +11,8 @@ interface WalletContextType {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   refreshBalance: () => Promise<void>;
+  signTransactions: (txns: Uint8Array[]) => Promise<Uint8Array[]>;
+  sendTransactions: (signedTxns: Uint8Array[]) => Promise<{ txId: string }>;
   loading: boolean;
 }
 
@@ -24,18 +26,62 @@ export const useWalletContext = () => {
   return context;
 };
 
-const WalletProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { connect: connectWallet, disconnect: disconnectWallet, activeAccount, signTransactions, sendTransactions } = useWallet();
+const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [peraWallet, setPeraWallet] = useState<PeraWalletConnect | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [address, setAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const isConnected = !!activeAccount;
-  const address = activeAccount?.address || null;
+  useEffect(() => {
+    console.log('Initializing Pera Wallet...');
+    const peraWalletConnect = new PeraWalletConnect({
+      chainId: 416002, // Testnet
+    });
+
+    setPeraWallet(peraWalletConnect);
+    console.log('Pera Wallet initialized');
+
+    // Check if already connected
+    peraWalletConnect.reconnectSession().then((accounts) => {
+      console.log('Reconnect session accounts:', accounts);
+      if (accounts.length) {
+        setAddress(accounts[0]);
+        setIsConnected(true);
+        console.log('Reconnected to wallet:', accounts[0]);
+      }
+    }).catch((error) => {
+      console.log('No existing session:', error);
+    });
+
+    // Note: PeraWallet doesn't have onDisconnect event listener
+    // We'll handle disconnection through the disconnect method
+
+    return () => {
+      peraWalletConnect.disconnect();
+    };
+  }, []);
 
   const connect = async () => {
+    if (!peraWallet) {
+      console.error('PeraWallet not initialized');
+      return;
+    }
+    
     try {
       setLoading(true);
-      await connectWallet();
+      console.log('Attempting to connect to Pera Wallet...');
+      const accounts = await peraWallet.connect();
+      console.log('Connected accounts:', accounts);
+      if (accounts.length) {
+        const connectedAddress = accounts[0];
+        console.log('Setting address:', connectedAddress, 'Type:', typeof connectedAddress);
+        setAddress(connectedAddress);
+        setIsConnected(true);
+        console.log('Wallet connected successfully:', connectedAddress);
+      } else {
+        console.log('No accounts returned from Pera Wallet');
+      }
     } catch (error) {
       console.error('Failed to connect wallet:', error);
     } finally {
@@ -44,9 +90,13 @@ const WalletProviderInner: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const disconnect = async () => {
+    if (!peraWallet) return;
+    
     try {
       setLoading(true);
-      await disconnectWallet();
+      await peraWallet.disconnect();
+      setAddress(null);
+      setIsConnected(false);
       setBalance(null);
     } catch (error) {
       console.error('Failed to disconnect wallet:', error);
@@ -61,12 +111,37 @@ const WalletProviderInner: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
       const accountInfo = await algodClient.accountInformation(address).do();
-      const balanceInAlgos = microAlgosToAlgos(accountInfo.amount);
+      const balanceInAlgos = microAlgosToAlgos(Number(accountInfo.amount));
       setBalance(balanceInAlgos);
     } catch (error) {
       console.error('Failed to fetch balance:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const signTransactions = async (txns: Uint8Array[]): Promise<Uint8Array[]> => {
+    if (!peraWallet || !address) {
+      throw new Error('Wallet not connected');
+    }
+    
+    try {
+      // Pera Wallet expects an array of transaction objects
+      const signedTxns = await peraWallet.signTransaction([txns[0]] as any);
+      return [signedTxns[0]];
+    } catch (error) {
+      console.error('Failed to sign transactions:', error);
+      throw error;
+    }
+  };
+
+  const sendTransactions = async (signedTxns: Uint8Array[]): Promise<{ txId: string }> => {
+    try {
+      const result = await algodClient.sendRawTransaction(signedTxns[0]).do();
+      return { txId: result.txid };
+    } catch (error) {
+      console.error('Failed to send transactions:', error);
+      throw error;
     }
   };
 
@@ -83,8 +158,18 @@ const WalletProviderInner: React.FC<{ children: React.ReactNode }> = ({ children
     connect,
     disconnect,
     refreshBalance,
+    signTransactions,
+    sendTransactions,
     loading,
   };
+
+  console.log('WalletContext value:', { 
+    isConnected, 
+    address, 
+    addressType: typeof address,
+    addressLength: address?.length,
+    loading 
+  });
 
   return (
     <WalletContext.Provider value={value}>
@@ -93,10 +178,4 @@ const WalletProviderInner: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return (
-    <UseWalletProvider>
-      <WalletProviderInner>{children}</WalletProviderInner>
-    </UseWalletProvider>
-  );
-};
+export { WalletProvider };
