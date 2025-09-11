@@ -6,10 +6,10 @@ import { Navbar } from "@/components/navbar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useWalletContext } from "@/contexts/WalletContext"
-import { PlaceholdersAndVanishInput } from "@/components/input-front"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import SmartContractVerificationFlow from "@/components/SmartContractVerificationFlow"
+import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
 import { 
   algodClient, 
   algosToMicroAlgos, 
@@ -17,9 +17,9 @@ import {
   ESCROW_MNEMONIC
 } from "@/lib/algorand"
 import algosdk from "algosdk"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { CheckCircle, AlertTriangle, XCircle, Loader2, ExternalLink, Shield } from "lucide-react"
-import { motion } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
 import { Search, ArrowRight, Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -89,6 +89,13 @@ export default function VerifyPage() {
   const [depositTxId, setDepositTxId] = useState<string | null>(null);
   const [refundTxId, setRefundTxId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const progressValue = useMemo(() => {
+    if (refundTxId) return 100;
+    if (verificationResult) return 70;
+    if (depositTxId) return 35;
+    return isProcessing ? 15 : 0;
+  }, [isProcessing, depositTxId, verificationResult, refundTxId]);
 
   const handleVerify = async () => {
     if (!verificationUrl.trim()) return;
@@ -246,7 +253,7 @@ export default function VerifyPage() {
               animate={{ opacity: 1, y: 0 }}
               className={`${instrumentSerif.className} text-white text-center text-balance font-normal tracking-tight text-6xl md:text-7xl mb-8`}
             >
-              Verify Before You Share
+              Verify before you share
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0, y: 20 }}
@@ -254,21 +261,25 @@ export default function VerifyPage() {
               transition={{ delay: 0.2 }}
               className="text-white/90 text-xl mb-12 text-balance max-w-3xl mx-auto leading-relaxed"
             >
-              Stop the spread of misinformation. Our AI-powered verification system analyzes content across multiple platforms and provides instant, trustworthy results.
+              Paste a link to any post, article, or video. We analyze it with multiple AI agents and return a clear verdict. Deposit 1 ALGO to start; receive 2 ALGO back after verification.
             </motion.p>
           </section>
 
           {/* Enhanced Verification Interface */}
           <section className="max-w-3xl mx-auto mb-20">
             <Card className="bg-white/5 border-white/10 backdrop-blur-md shadow-2xl">
-              <CardContent className="p-8">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-white flex items-center gap-2 text-2xl">
+                  <Shield className="h-6 w-6 text-blue-400" />
+                  Content verification
+                </CardTitle>
+                <CardDescription className="text-white/70">
+                  Deposit 1 ALGO to begin. After analysis, you receive 2 ALGO back as reward.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-8 pt-2">
                 {/* Input Section */}
                 <div className="space-y-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <Shield className="h-6 w-6 text-blue-400" />
-                    <h2 className="text-xl text-white font-medium">Content Verification</h2>
-                  </div>
-
                   {/* Sophisticated Input Field */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -278,9 +289,26 @@ export default function VerifyPage() {
                       type="text"
                       value={verificationUrl}
                       onChange={(e) => setVerificationUrl(e.target.value)}
-                      placeholder="Paste content URL here..."
-                      className="w-full bg-white/5 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      placeholder="Paste link to the post / article / video"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg py-3 pl-10 pr-28 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     />
+                    <Button
+                      onClick={handleVerify}
+                      disabled={isProcessing || !verificationUrl}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-500/80 to-purple-500/80 hover:from-blue-500/90 hover:to-purple-500/90 text-white h-9 px-4"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Verifying
+                        </>
+                      ) : (
+                        <>
+                          Verify
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
                   </div>
 
                   {/* Verification Info */}
@@ -292,40 +320,110 @@ export default function VerifyPage() {
                           <span>Verification Process</span>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Deposit 1 ALGO, earn 2 ALGO for verified safe content</p>
+                          <p>Deposit 1 ALGO. We refund 2 ALGO after verification.</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    <span>Typical verification time: ~30 seconds</span>
+                    <span>Typical verification time: ~30–60 seconds</span>
                   </div>
 
-                  {/* Action Button */}
-                  <Button
-                    onClick={handleVerify}
-                    disabled={isProcessing || !verificationUrl}
-                    className="w-full bg-gradient-to-r from-blue-500/80 to-purple-500/80 hover:from-blue-500/90 hover:to-purple-500/90 text-white border-none shadow-lg"
-                  >
-                    {isProcessing ? (
-                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    ) : (
-                      <>
-                        Start Verification
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </>
+                  {/* Progress + Stepper */}
+                  <AnimatePresence mode="popLayout">
+                    {isProcessing && (
+                      <motion.div
+                        key="progress"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="space-y-3"
+                      >
+                        <Progress value={progressValue} className="h-2 bg-white/10" />
+                        <div className="grid grid-cols-3 gap-2 text-xs text-white/70">
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2.5 w-2.5 rounded-full ${depositTxId ? 'bg-green-400' : 'bg-white/40 animate-pulse'}`}></span>
+                            Deposit
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2.5 w-2.5 rounded-full ${verificationResult ? 'bg-green-400' : depositTxId ? 'bg-blue-300 animate-pulse' : 'bg-white/40'}`}></span>
+                            Analyze
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2.5 w-2.5 rounded-full ${refundTxId ? 'bg-green-400' : verificationResult ? 'bg-purple-300 animate-pulse' : 'bg-white/40'}`}></span>
+                            Reward
+                          </div>
+                        </div>
+                      </motion.div>
                     )}
-                  </Button>
+                  </AnimatePresence>
                 </div>
 
                 {/* Results Section */}
-                {verificationResult && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-8 p-6 bg-white/5 rounded-lg border border-white/10"
-                  >
-                    {/* ... existing results display logic with refined styling ... */}
-                  </motion.div>
-                )}
+                <AnimatePresence>
+                  {isProcessing && !depositTxId && (
+                    <motion.div
+                      key="skeleton"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="mt-8 p-6 bg-white/5 rounded-lg border border-white/10 space-y-4"
+                    >
+                      <Skeleton className="h-5 w-40 bg-white/10" />
+                      <Skeleton className="h-4 w-full bg-white/10" />
+                      <Skeleton className="h-4 w-5/6 bg-white/10" />
+                    </motion.div>
+                  )}
+
+                  {verificationResult && (
+                    <motion.div 
+                      key="result"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className={`mt-8 p-6 rounded-lg border ${getResultColor(getDecisionValue())}`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="shrink-0">{getResultIcon(getDecisionValue())}</div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <Badge variant="secondary" className="bg-white/20 text-white">
+                              {getDecisionValue().toUpperCase()}
+                            </Badge>
+                            <span className="text-white/90 text-sm">Confidence: {Math.round((verificationResult.confidence || 0) * 100)}%</span>
+                            {typeof verificationResult.consensus_score === 'number' && (
+                              <span className="text-white/90 text-sm">Consensus: {Math.round((verificationResult.consensus_score || 0) * 100)}%</span>
+                            )}
+                          </div>
+                          {verificationResult.group_reasoning && (
+                            <p className="text-white/90">{verificationResult.group_reasoning}</p>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-3 pt-2 text-sm">
+                            {depositTxId && (
+                              <a
+                                href={`https://testnet.algoexplorer.io/tx/${depositTxId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-blue-200 hover:text-blue-100"
+                              >
+                                Deposit TX <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                            {refundTxId && (
+                              <a
+                                href={`https://testnet.algoexplorer.io/tx/${refundTxId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-green-200 hover:text-green-100"
+                              >
+                                Reward TX <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Error Display */}
                 {error && (
