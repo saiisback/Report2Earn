@@ -192,11 +192,11 @@ class XScraper:
                             result['engagement']['comments'] = count
                             print(f"Found replies: {count}")
                     
-                    elif 'retweet' in text.lower() or 'retweets' in text.lower():
+                    elif 'retweet' in text.lower() or 'retweets' in text.lower() or 'repost' in text.lower() or 'reposts' in text.lower():
                         count = self._extract_number_from_text(text)
                         if count is not None:
                             result['engagement']['shares'] = count
-                            print(f"Found retweets: {count}")
+                            print(f"Found retweets/reposts: {count}")
                     
                     elif 'like' in text.lower() or 'likes' in text.lower():
                         count = self._extract_number_from_text(text)
@@ -215,6 +215,46 @@ class XScraper:
         
         except Exception as e:
             print(f"Error extracting engagement metrics: {e}")
+        
+        # Additional retweet extraction if not found above
+        if result['engagement']['shares'] == 0:
+            self._extract_retweets_specific(result)
+    
+    def _extract_retweets_specific(self, result: Dict):
+        """Specific method to extract retweets with better selectors"""
+        try:
+            # Try different selectors for retweets/reposts
+            retweet_selectors = [
+                '[data-testid="retweet"]',
+                '[data-testid="repost"]',
+                '[aria-label*="retweet"]',
+                '[aria-label*="repost"]',
+                'button[aria-label*="retweet"]',
+                'button[aria-label*="repost"]',
+                '[data-testid="retweet"] span',
+                '[data-testid="repost"] span',
+                'div[data-testid="retweet"] span',
+                'div[data-testid="repost"] span'
+            ]
+            
+            for selector in retweet_selectors:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for element in elements:
+                        text = element.text.strip()
+                        if not text:
+                            text = element.get_attribute('aria-label') or ''
+                        
+                        if text and ('retweet' in text.lower() or 'repost' in text.lower()):
+                            count = self._extract_number_from_text(text)
+                            if count is not None and count > 0:
+                                result['engagement']['shares'] = count
+                                print(f"Found retweets (specific): {count}")
+                                return
+                except NoSuchElementException:
+                    continue
+        except Exception as e:
+            print(f"Error in specific retweet extraction: {e}")
     
     def _extract_number_from_text(self, text: str) -> Optional[int]:
         """Extract number from text like '1,234 likes' or '5.2K likes'"""
