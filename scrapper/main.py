@@ -469,6 +469,9 @@ class XScraper:
                     karma = self._fetch_reddit_user_karma(result['author']['username'])
                     if karma is not None:
                         result['author']['karma'] = karma
+                # If awards still look zero, try DOM fallback too
+                if not result['reddit']['awards']:
+                    self._extract_reddit_awards_dom(result)
                 return result
 
             self.driver.get(url)
@@ -518,21 +521,7 @@ class XScraper:
                 pass
 
             # Awards count: scan for award elements
-            try:
-                award_candidates = self.driver.find_elements(By.CSS_SELECTOR, '[aria-label*="award" i], [title*="award" i], img[alt*="award" i], span:contains("Awards")')
-            except Exception:
-                award_candidates = []
-            awards_total = 0
-            for el in award_candidates:
-                label = (el.get_attribute('aria-label') or el.get_attribute('title') or el.get_attribute('alt') or el.text or '').strip()
-                if not label:
-                    continue
-                m = re.search(r'(\d+[.,\d]*\s*[KMB]?)', label)
-                if m:
-                    val = self._extract_number_from_text(m.group(1))
-                    if val is not None:
-                        awards_total = max(awards_total, val)
-            result['reddit']['awards'] = awards_total
+            self._extract_reddit_awards_dom(result)
 
             # Author username
             try:
@@ -578,6 +567,62 @@ class XScraper:
             pass
         return None
 
+    def _extract_reddit_awards_dom(self, result: Dict) -> None:
+        """Extract awards from the visible Reddit UI as a fallback."""
+        try:
+            awards_total = 0
+            selectors = [
+                '[data-click-id="awards"]',
+                '[aria-label*="award" i]',
+                '[title*="award" i]',
+                'img[alt*="award" i]'
+            ]
+            elements: List = []
+            for sel in selectors:
+                try:
+                    elements.extend(self.driver.find_elements(By.CSS_SELECTOR, sel))
+                except Exception:
+                    continue
+            for el in elements:
+                label = (el.get_attribute('aria-label') or el.get_attribute('title') or el.get_attribute('alt') or el.text or '').strip()
+                if not label:
+                    continue
+                m = re.search(r'(\d+[.,\d]*\s*[KMB]?)', label)
+                if m:
+                    val = self._extract_number_from_text(m.group(1))
+                    if val is not None:
+                        awards_total = max(awards_total, val)
+            # Also, sometimes the number is a sibling span inside the awards container
+            if awards_total == 0:
+                try:
+                    containers = self.driver.find_elements(By.CSS_SELECTOR, '[data-click-id="awards"]')
+                    for c in containers:
+                        txt = (c.text or '').strip()
+                        if not txt:
+                            # check child spans
+                            spans = c.find_elements(By.CSS_SELECTOR, 'span, div')
+                            for s in spans:
+                                t = (s.text or '').strip()
+                                if t and re.search(r'award', t, re.IGNORECASE):
+                                    m = re.search(r'(\d+[.,\d]*\s*[KMB]?)', t)
+                                    if m:
+                                        val = self._extract_number_from_text(m.group(1))
+                                        if val is not None:
+                                            awards_total = max(awards_total, val)
+                        else:
+                            m = re.search(r'(\d+[.,\d]*\s*[KMB]?)', txt)
+                            if m:
+                                val = self._extract_number_from_text(m.group(1))
+                                if val is not None:
+                                    awards_total = max(awards_total, val)
+                except Exception:
+                    pass
+            if awards_total:
+                result['reddit']['awards'] = awards_total
+                print(f"Reddit awards (DOM): {awards_total}")
+        except Exception as e:
+            print(f"Error extracting Reddit awards DOM: {e}")
+
     def _fetch_reddit_post_json(self, url: str):
         """Fetch Reddit post JSON by appending .json to the post URL."""
         try:
@@ -599,6 +644,8 @@ class XScraper:
             # Try old.reddit host
             old_host = parsed.netloc.replace('www.reddit.com', 'old.reddit.com')
             json_urls.append(f"{parsed.scheme}://{old_host}{path}.json")
+            # Also try with raw_json=1
+            json_urls.extend([u + ('&' if '?' in u else '?') + 'raw_json=1' for u in list(json_urls)])
 
             for json_url in json_urls:
                 try:
