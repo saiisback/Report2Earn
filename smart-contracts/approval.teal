@@ -1,0 +1,59 @@
+#pragma version 6
+
+// Simple smart contract for AI verification rewards
+// This contract just tracks opt-ins and allows basic operations
+
+// Check transaction type
+txn OnCompletion
+int NoOp
+==
+bnz handle_noop
+
+txn OnCompletion
+int OptIn
+==
+bnz handle_optin
+
+txn OnCompletion
+int CloseOut
+==
+bnz handle_closeout
+
+txn OnCompletion
+int UpdateApplication
+==
+bnz handle_updateapp
+
+txn OnCompletion
+int DeleteApplication
+==
+bnz handle_deleteapp
+
+// Unexpected transaction type
+err
+
+handle_noop:
+// Allow all NoOp transactions
+// The reward logic is handled by the frontend/escrow
+int 1
+return
+
+handle_optin:
+// Allow anyone to opt in
+int 1
+return
+
+handle_closeout:
+// Allow closeout
+int 1
+return
+
+handle_updateapp:
+// Allow updates
+int 1
+return
+
+handle_deleteapp:
+// Allow deletion
+int 1
+return

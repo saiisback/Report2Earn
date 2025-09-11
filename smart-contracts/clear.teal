@@ -1,0 +1,8 @@
+#pragma version 6
+
+// Clear state program - allows users to clear their local state
+// This is called when a user wants to opt out of the application
+
+// Always approve clear state
+int 1
+return
