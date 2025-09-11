@@ -15,6 +15,14 @@ import { useState } from "react"
 import { CheckCircle, AlertTriangle, XCircle, Loader2, ExternalLink, Shield } from "lucide-react"
 
 // Type definitions
+interface AgentDecision {
+  agent_name: string;
+  decision: 'authentic' | 'fake' | 'uncertain';
+  confidence: number;
+  reasoning: string;
+  evidence: string[];
+}
+
 interface VerificationResult {
   final_decision: {
     value: 'authentic' | 'fake' | 'uncertain';
@@ -22,6 +30,7 @@ interface VerificationResult {
   confidence: number;
   consensus_score: number;
   group_reasoning: string;
+  individual_decisions?: AgentDecision[];
 }
 
 interface ScrapedContent {
@@ -51,6 +60,7 @@ interface VerificationResponse {
     confidence: number;
     consensus_score: number;
     group_reasoning: string;
+    individual_decisions?: AgentDecision[];
   };
 }
 
@@ -331,7 +341,7 @@ export default function VerifyPage() {
                       <div className={`${getResultColor(getDecisionValue())} border-2 rounded-lg p-6`}>
                         <div className="flex items-center gap-4">
                           <div className="text-white">
-                            {getResultIcon(getDecisionValue())}
+                          {getResultIcon(getDecisionValue())}
                           </div>
                           <div className="flex-1">
                             <h3 className="text-white text-2xl font-bold mb-2">
@@ -358,12 +368,41 @@ export default function VerifyPage() {
                           AI Analysis
                         </h4>
                         <div className="text-white/80 text-sm leading-relaxed space-y-3">
+                          {/* Process and display group reasoning */}
                           {verificationResult.group_decision?.group_reasoning ? (
                             <div>
-                              <p className="font-medium text-white mb-2">Group Analysis:</p>
-                              <p className="bg-white/5 p-3 rounded-lg">
-                                {verificationResult.group_decision.group_reasoning}
-                              </p>
+                              <p className="font-medium text-white mb-2">AI Analysis Summary:</p>
+                              <div className="bg-white/5 p-4 rounded-lg">
+                                <p className="text-white/90 mb-3">
+                                  {verificationResult.group_decision.group_reasoning.split('\n').map((line, index) => {
+                                    if (line.includes('Group Decision:')) {
+                                      return (
+                                        <div key={index} className="font-bold text-lg mb-2 text-white">
+                                          {line.replace('Group Decision:', 'Final Decision:')}
+                                        </div>
+                                      );
+                                    }
+                                    if (line.includes('Consensus Score:')) {
+                                      return (
+                                        <div key={index} className="text-white/80 mb-3">
+                                          {line}
+                                        </div>
+                                      );
+                                    }
+                                    if (line.includes('Individual Agent Analysis:')) {
+                                      return null; // Skip this line as we handle it separately
+                                    }
+                                    if (line.trim() === '') {
+                                      return <br key={index} />;
+                                    }
+                                    return (
+                                      <p key={index} className="text-white/80 mb-2">
+                                        {line}
+                                      </p>
+                                    );
+                                  })}
+                                </p>
+                              </div>
                             </div>
                           ) : verificationResult.group_reasoning ? (
                             <div>
@@ -383,29 +422,75 @@ export default function VerifyPage() {
                             <p className="text-white/60 italic">No detailed analysis available</p>
                           )}
                           
-                          {/* Individual Model Decisions */}
+                          {/* Individual Model Decisions - Processed and formatted */}
                           {verificationResult.group_decision?.individual_decisions && (
                             <div className="mt-4">
-                              <p className="font-medium text-white mb-2">Individual Model Decisions:</p>
-                              <div className="space-y-2">
-                                {verificationResult.group_decision.individual_decisions.map((decision, index) => (
-                                  <div key={index} className="bg-white/5 p-3 rounded-lg">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span className="text-white font-medium text-xs">{decision.agent_name}</span>
-                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                        decision.decision === 'authentic' ? 'bg-green-500/20 text-green-400' :
-                                        decision.decision === 'fake' ? 'bg-red-500/20 text-red-400' :
-                                        'bg-yellow-500/20 text-yellow-400'
-                                      }`}>
-                                        {decision.decision.toUpperCase()}
-                                      </span>
-                                      <span className="text-white/60 text-xs">
-                                        ({(decision.confidence * 100).toFixed(0)}%)
-                                      </span>
+                              <p className="font-medium text-white mb-3">AI Model Analysis:</p>
+                              <div className="space-y-3">
+                                {verificationResult.group_decision.individual_decisions.map((decision: AgentDecision, index: number) => {
+                                  // Check if this is an error response
+                                  const isError = decision.reasoning.includes('Error code:') || 
+                                                decision.reasoning.includes('failed:') ||
+                                                decision.reasoning.includes('User not found') ||
+                                                decision.reasoning.includes('Rate limit exceeded');
+                                  
+                                  return (
+                                    <div key={index} className={`p-4 rounded-lg ${
+                                      isError ? 'bg-red-500/10 border border-red-500/20' : 'bg-white/5'
+                                    }`}>
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <span className="text-white font-medium text-sm">
+                                          {decision.agent_name.replace('Model: ', '')}
+                                        </span>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                          isError ? 'bg-red-500/20 text-red-400' :
+                                          decision.decision === 'authentic' ? 'bg-green-500/20 text-green-400' :
+                                          decision.decision === 'fake' ? 'bg-red-500/20 text-red-400' :
+                                          'bg-yellow-500/20 text-yellow-400'
+                                        }`}>
+                                          {isError ? 'ERROR' : decision.decision.toUpperCase()}
+                                        </span>
+                                        {!isError && (
+                                          <span className="text-white/60 text-xs">
+                                            {(decision.confidence * 100).toFixed(0)}% confidence
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      {isError ? (
+                                        <div className="text-red-300 text-xs">
+                                          <p className="font-medium mb-1">⚠️ Model temporarily unavailable</p>
+                                          <p className="text-red-400/80">
+                                            {decision.reasoning.includes('User not found') ? 
+                                              'Authentication issue - please try again later' :
+                                              decision.reasoning.includes('Rate limit exceeded') ?
+                                              'Daily limit reached - please try again tomorrow' :
+                                              'Service temporarily unavailable'
+                                            }
+                                          </p>
+                                        </div>
+                                      ) : (
+                                        <p className="text-white/70 text-xs leading-relaxed">
+                                          {decision.reasoning}
+                                        </p>
+                                      )}
+                                      
+                                      {decision.evidence && decision.evidence.length > 0 && (
+                                        <div className="mt-2">
+                                          <p className="text-white/60 text-xs font-medium mb-1">Evidence:</p>
+                                          <ul className="text-white/60 text-xs space-y-1">
+                                            {decision.evidence.map((evidence: string, evidenceIndex: number) => (
+                                              <li key={evidenceIndex} className="flex items-start gap-2">
+                                                <span className="text-white/40">•</span>
+                                                <span>{evidence}</span>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
                                     </div>
-                                    <p className="text-white/70 text-xs">{decision.reasoning}</p>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
