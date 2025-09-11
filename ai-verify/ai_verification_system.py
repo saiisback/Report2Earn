@@ -62,184 +62,280 @@ class VerificationState(BaseModel):
 
 class AgenticVerificationSystem:
     def __init__(self):
-        # Initialize OpenRouter client (using free models from the list)
-        self.client = ChatOpenAI(
-            model="openai/gpt-3.5-turbo",  # Free model from OpenRouter
-            openai_api_base="https://openrouter.ai/api/v1",
-            openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-            temperature=0.7
-        )
+        # Initialize multiple OpenRouter clients using free models
+        self.models = {
+            "nvidia_nemotron": ChatOpenAI(
+                model="nvidia/nemotron-nano-9b-v2:free",
+                openai_api_base="https://openrouter.ai/api/v1",
+                openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+                temperature=0.7,
+                timeout=30,
+                max_retries=2
+            ),
+            "z_ai_glm": ChatOpenAI(
+                model="z-ai/glm-4.5-air:free",
+                openai_api_base="https://openrouter.ai/api/v1",
+                openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+                temperature=0.7,
+                timeout=30,
+                max_retries=2
+            ),
+            "mistral_small": ChatOpenAI(
+                model="mistralai/mistral-small-3.2-24b-instruct:free",
+                openai_api_base="https://openrouter.ai/api/v1",
+                openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+                temperature=0.7,
+                timeout=30,
+                max_retries=2
+            ),
+            "deepseek_r1_qwen": ChatOpenAI(
+                model="deepseek/deepseek-r1-0528-qwen3-8b:free",
+                openai_api_base="https://openrouter.ai/api/v1",
+                openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+                temperature=0.7,
+                timeout=30,
+                max_retries=2
+            ),
+            "deepseek_r1": ChatOpenAI(
+                model="deepseek/deepseek-r1:free",
+                openai_api_base="https://openrouter.ai/api/v1",
+                openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+                temperature=0.7,
+                timeout=30,
+                max_retries=2
+            )
+        }
         
         # Create the verification workflow
         self.workflow = self._create_verification_workflow()
     
     def _create_verification_workflow(self) -> StateGraph:
-        """Create the LangGraph workflow for multi-agent verification"""
+        """Create the LangGraph workflow for multi-model verification"""
         
         workflow = StateGraph(VerificationState)
         
-        # Add nodes for each agent
-        workflow.add_node("fact_checker", self._fact_checker_agent)
-        workflow.add_node("image_analyst", self._image_analyst_agent)
-        workflow.add_node("source_verifier", self._source_verifier_agent)
-        workflow.add_node("context_analyst", self._context_analyst_agent)
+        # Add nodes for each verification step using multiple models
+        workflow.add_node("multi_model_verification", self._multi_model_verification)
         workflow.add_node("group_decision", self._group_decision_maker)
         
         # Define the flow
-        workflow.set_entry_point("fact_checker")
-        workflow.add_edge("fact_checker", "image_analyst")
-        workflow.add_edge("image_analyst", "source_verifier")
-        workflow.add_edge("source_verifier", "context_analyst")
-        workflow.add_edge("context_analyst", "group_decision")
+        workflow.set_entry_point("multi_model_verification")
+        workflow.add_edge("multi_model_verification", "group_decision")
         workflow.add_edge("group_decision", END)
         
         return workflow.compile()
     
-    async def _fact_checker_agent(self, state: VerificationState) -> VerificationState:
-        """Fact-checking agent that verifies claims and statements"""
+    async def _multi_model_verification(self, state: VerificationState) -> VerificationState:
+        """Multi-model verification using all 5 free OpenRouter models"""
         
+        print(f"🔍 Starting multi-model verification for URL: {state.content_url}")
+        print(f"📝 Content text length: {len(state.content_text)} characters")
+        print(f"🖼️ Images count: {len(state.content_images) if state.content_images else 0}")
+        
+        # Create verification prompt
         prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content="""You are a fact-checking expert. Your job is to:
-1. Analyze the content for factual claims
-2. Check for logical inconsistencies
-3. Identify potential misinformation patterns
-4. Provide a confidence score (0-1) and detailed reasoning
+            SystemMessage(content="""You are an AI content verification expert. Analyze the given content and determine if it's authentic, fake, or uncertain.
 
-Respond with JSON format:
+Your analysis should cover:
+1. Factual accuracy and logical consistency
+2. Source credibility and attribution
+3. Context and timing relevance
+4. Potential manipulation indicators
+5. Overall authenticity assessment
+
+IMPORTANT: You MUST respond with ONLY valid JSON in this exact format:
 {
-    "decision": "authentic" | "fake" | "uncertain",
-    "confidence": 0.0-1.0,
-    "reasoning": "detailed explanation",
+    "decision": "authentic",
+    "confidence": 0.8,
+    "reasoning": "Your detailed analysis here",
     "evidence": ["evidence1", "evidence2"]
-}"""),
-            HumanMessage(content=f"Please fact-check this content: {state.content_text}")
+}
+
+Valid decision values: "authentic", "fake", "uncertain"
+Confidence must be a number between 0.0 and 1.0
+Do not include any text outside the JSON object."""),
+            HumanMessage(content=f"""Content to verify:
+URL: {state.content_url}
+Text: {state.content_text}
+Images: {state.content_images if state.content_images else "None"}
+
+Analyze this content and respond with ONLY the JSON format specified above.""")
         ])
         
-        response = await self.client.ainvoke(prompt.format_messages())
-        decision_data = json.loads(response.content)
+        # Run verification with models sequentially to avoid hanging
+        model_names = list(self.models.keys())
+        results = []
         
-        state.fact_checker_decision = AgentDecision(
-            agent_name="Fact Checker",
-            decision=VerificationResult(decision_data["decision"]),
-            confidence=decision_data["confidence"],
-            reasoning=decision_data["reasoning"],
-            evidence=decision_data["evidence"]
-        )
+        print(f"🤖 Starting verification with {len(model_names)} models: {model_names}")
         
-        return state
-    
-    async def _image_analyst_agent(self, state: VerificationState) -> VerificationState:
-        """Image analysis agent that examines visual content"""
+        for i, (model_name, client) in enumerate(self.models.items()):
+            print(f"🚀 Processing model {i+1}/{len(model_names)}: {model_name}")
+            try:
+                result = await asyncio.wait_for(
+                    self._verify_with_model(client, model_name, prompt, state),
+                    timeout=30  # 30 second timeout per model
+                )
+                results.append(result)
+                print(f"✅ Model {model_name} completed successfully")
+            except asyncio.TimeoutError:
+                print(f"⏰ Model {model_name} timed out, skipping")
+                results.append(self._create_fallback_decision(model_name, "Timeout"))
+            except Exception as e:
+                print(f"❌ Model {model_name} failed: {e}")
+                results.append(self._create_fallback_decision(model_name, str(e)))
         
-        if not state.content_images:
-            # No images to analyze
-            state.image_analyst_decision = AgentDecision(
-                agent_name="Image Analyst",
+        print(f"✅ All models processed. Results count: {len(results)}")
+        
+        # Process results and create agent decisions
+        decisions = []
+        print(f"📊 Processing results from {len(results)} models...")
+        
+        for i, result in enumerate(results):
+            model_name = model_names[i]
+            print(f"🔍 Processing result {i+1}/{len(results)} for model: {model_name}")
+            
+            if isinstance(result, Exception):
+                print(f"❌ Model {model_name} failed with exception: {result}")
+                continue
+                
+            print(f"✅ Model {model_name} returned result: {result}")
+            decision_data = result
+            
+            # Create agent decision
+            agent_decision = AgentDecision(
+                agent_name=f"Model: {model_name.replace('_', ' ').title()}",
+                decision=VerificationResult(decision_data["decision"]),
+                confidence=decision_data["confidence"],
+                reasoning=decision_data["reasoning"],
+                evidence=decision_data["evidence"]
+            )
+            decisions.append(agent_decision)
+            print(f"✅ Created decision for {model_name}: {decision_data['decision']} (confidence: {decision_data['confidence']})")
+        
+        print(f"📋 Total valid decisions: {len(decisions)}")
+        
+        # Ensure we have at least some decisions
+        if len(decisions) == 0:
+            print(f"⚠️ No valid decisions, creating fallback")
+            decisions.append(AgentDecision(
+                agent_name="Fallback",
                 decision=VerificationResult.UNCERTAIN,
                 confidence=0.0,
-                reasoning="No images provided for analysis",
+                reasoning="All models failed",
                 evidence=[]
-            )
-            return state
+            ))
         
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content="""You are an image analysis expert. Your job is to:
-1. Analyze images for signs of manipulation
-2. Check for consistency with the text content
-3. Look for visual red flags (deepfakes, edited content, etc.)
-4. Provide a confidence score (0-1) and detailed reasoning
-
-Respond with JSON format:
-{
-    "decision": "authentic" | "fake" | "uncertain",
-    "confidence": 0.0-1.0,
-    "reasoning": "detailed explanation",
-    "evidence": ["evidence1", "evidence2"]
-}"""),
-            HumanMessage(content=f"Analyze these images in relation to the content: {state.content_text}\nImages: {state.content_images}")
-        ])
-        
-        response = await self.client.ainvoke(prompt.format_messages())
-        decision_data = json.loads(response.content)
-        
-        state.image_analyst_decision = AgentDecision(
-            agent_name="Image Analyst",
-            decision=VerificationResult(decision_data["decision"]),
-            confidence=decision_data["confidence"],
-            reasoning=decision_data["reasoning"],
-            evidence=decision_data["evidence"]
-        )
+        # Store all decisions in the state
+        state.fact_checker_decision = decisions[0] if len(decisions) > 0 else None
+        state.image_analyst_decision = decisions[1] if len(decisions) > 1 else None
+        state.source_verifier_decision = decisions[2] if len(decisions) > 2 else None
+        state.context_analyst_decision = decisions[3] if len(decisions) > 3 else None
         
         return state
     
-    async def _source_verifier_agent(self, state: VerificationState) -> VerificationState:
-        """Source verification agent that checks credibility and sources"""
-        
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content="""You are a source verification expert. Your job is to:
-1. Analyze the credibility of sources mentioned
-2. Check for proper attribution
-3. Look for bias or agenda indicators
-4. Verify if sources are reliable and authoritative
-
-Respond with JSON format:
-{
-    "decision": "authentic" | "fake" | "uncertain",
-    "confidence": 0.0-1.0,
-    "reasoning": "detailed explanation",
-    "evidence": ["evidence1", "evidence2"]
-}"""),
-            HumanMessage(content=f"Verify the sources and credibility of this content: {state.content_text}")
-        ])
-        
-        response = await self.client.ainvoke(prompt.format_messages())
-        decision_data = json.loads(response.content)
-        
-        state.source_verifier_decision = AgentDecision(
-            agent_name="Source Verifier",
-            decision=VerificationResult(decision_data["decision"]),
-            confidence=decision_data["confidence"],
-            reasoning=decision_data["reasoning"],
-            evidence=decision_data["evidence"]
-        )
-        
-        return state
+    async def _verify_with_model(self, client, model_name, prompt, state):
+        """Verify content with a specific model"""
+        print(f"🔄 Calling model: {model_name}")
+        try:
+            response = await client.ainvoke(prompt.format_messages())
+            print(f"📨 Model {model_name} responded with content length: {len(response.content) if response.content else 0}")
+            
+            # Check if response is valid
+            if not response or not response.content:
+                print(f"❌ Empty response from model {model_name}")
+                return self._create_fallback_decision(model_name, "Empty response from model")
+            
+            # Try to parse JSON response
+            try:
+                # Clean the response content (remove markdown code blocks)
+                content = response.content.strip()
+                if content.startswith("```json"):
+                    content = content[7:]  # Remove ```json
+                if content.startswith("```"):
+                    content = content[3:]   # Remove ```
+                if content.endswith("```"):
+                    content = content[:-3]  # Remove trailing ```
+                content = content.strip()
+                
+                decision_data = json.loads(content)
+                print(f"✅ Model {model_name} returned valid JSON: {decision_data}")
+                
+                # Validate required fields
+                required_fields = ["decision", "confidence", "reasoning", "evidence"]
+                if not all(field in decision_data for field in required_fields):
+                    print(f"❌ Invalid response format from model {model_name} - missing fields")
+                    return self._create_fallback_decision(model_name, "Invalid response format")
+                
+                # Validate decision value
+                if decision_data["decision"] not in ["authentic", "fake", "uncertain"]:
+                    print(f"⚠️ Model {model_name} returned invalid decision: {decision_data['decision']}, setting to uncertain")
+                    decision_data["decision"] = "uncertain"
+                
+                # Validate confidence range
+                if not isinstance(decision_data["confidence"], (int, float)) or not 0 <= decision_data["confidence"] <= 1:
+                    print(f"⚠️ Model {model_name} returned invalid confidence: {decision_data['confidence']}, setting to 0.5")
+                    decision_data["confidence"] = 0.5
+                
+                print(f"✅ Model {model_name} validation passed")
+                return decision_data
+                
+            except json.JSONDecodeError as json_err:
+                print(f"JSON parse error from model {model_name}: {json_err}")
+                print(f"Raw response: {response.content[:200]}...")
+                
+                # Try to extract JSON from the response using regex
+                import re
+                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                if json_match:
+                    try:
+                        json_str = json_match.group(0)
+                        decision_data = json.loads(json_str)
+                        return decision_data
+                    except json.JSONDecodeError:
+                        pass
+                
+                # Try to extract decision from text response
+                return self._parse_text_response(response.content, model_name)
+                
+        except Exception as e:
+            print(f"Error with model {model_name}: {e}")
+            return self._create_fallback_decision(model_name, str(e))
     
-    async def _context_analyst_agent(self, state: VerificationState) -> VerificationState:
-        """Context analysis agent that examines broader context and timing"""
+    def _create_fallback_decision(self, model_name, error_msg):
+        """Create a fallback decision when model fails"""
+        return {
+            "decision": "uncertain",
+            "confidence": 0.0,
+            "reasoning": f"Model {model_name} failed: {error_msg}",
+            "evidence": []
+        }
+    
+    def _parse_text_response(self, text, model_name):
+        """Try to parse a text response and extract decision"""
+        text_lower = text.lower()
         
-        prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content="""You are a context analysis expert. Your job is to:
-1. Analyze the broader context and timing
-2. Check for relevance to current events
-3. Look for patterns that might indicate manipulation
-4. Consider the overall narrative and agenda
-
-Respond with JSON format:
-{
-    "decision": "authentic" | "fake" | "uncertain",
-    "confidence": 0.0-1.0,
-    "reasoning": "detailed explanation",
-    "evidence": ["evidence1", "evidence2"]
-}"""),
-            HumanMessage(content=f"Analyze the context and timing of this content: {state.content_text}")
-        ])
+        # Try to determine decision from text
+        if "authentic" in text_lower or "real" in text_lower or "genuine" in text_lower:
+            decision = "authentic"
+            confidence = 0.6
+        elif "fake" in text_lower or "false" in text_lower or "misleading" in text_lower:
+            decision = "fake"
+            confidence = 0.6
+        else:
+            decision = "uncertain"
+            confidence = 0.3
         
-        response = await self.client.ainvoke(prompt.format_messages())
-        decision_data = json.loads(response.content)
-        
-        state.context_analyst_decision = AgentDecision(
-            agent_name="Context Analyst",
-            decision=VerificationResult(decision_data["decision"]),
-            confidence=decision_data["confidence"],
-            reasoning=decision_data["reasoning"],
-            evidence=decision_data["evidence"]
-        )
-        
-        return state
+        return {
+            "decision": decision,
+            "confidence": confidence,
+            "reasoning": f"Parsed from text response: {text[:200]}...",
+            "evidence": []
+        }
     
     async def _group_decision_maker(self, state: VerificationState) -> VerificationState:
-        """Group decision maker that synthesizes all agent decisions"""
+        """Group decision maker that synthesizes all model decisions"""
+        
+        print(f"🤝 Starting group decision making...")
         
         decisions = [
             state.fact_checker_decision,
@@ -248,8 +344,11 @@ Respond with JSON format:
             state.context_analyst_decision
         ]
         
+        print(f"📋 Raw decisions count: {len(decisions)}")
+        
         # Filter out None decisions
         valid_decisions = [d for d in decisions if d is not None]
+        print(f"✅ Valid decisions count: {len(valid_decisions)}")
         
         if not valid_decisions:
             state.group_decision = GroupDecision(
@@ -257,7 +356,7 @@ Respond with JSON format:
                 confidence=0.0,
                 consensus_score=0.0,
                 individual_decisions=[],
-                group_reasoning="No valid decisions from agents"
+                group_reasoning="No valid decisions from models"
             )
             state.verification_complete = True
             return state
@@ -267,22 +366,35 @@ Respond with JSON format:
         fake_count = sum(1 for d in valid_decisions if d.decision == VerificationResult.FAKE)
         uncertain_count = sum(1 for d in valid_decisions if d.decision == VerificationResult.UNCERTAIN)
         
+        print(f"📊 Decision counts - Authentic: {authentic_count}, Fake: {fake_count}, Uncertain: {uncertain_count}")
+        
         total_decisions = len(valid_decisions)
         consensus_score = max(authentic_count, fake_count) / total_decisions
+        print(f"🎯 Consensus score: {consensus_score:.2f}")
         
-        # Determine final decision
+        # Determine final decision with weighted voting
         if authentic_count > fake_count and authentic_count > uncertain_count:
             final_decision = VerificationResult.AUTHENTIC
+            print(f"🏆 Final decision: AUTHENTIC (majority: {authentic_count})")
         elif fake_count > authentic_count and fake_count > uncertain_count:
             final_decision = VerificationResult.FAKE
+            print(f"🏆 Final decision: FAKE (majority: {fake_count})")
         else:
             final_decision = VerificationResult.UNCERTAIN
+            print(f"🏆 Final decision: UNCERTAIN (no clear majority)")
         
-        # Calculate average confidence
-        avg_confidence = sum(d.confidence for d in valid_decisions) / len(valid_decisions)
+        # Calculate weighted average confidence based on decision alignment
+        aligned_decisions = [d for d in valid_decisions if d.decision == final_decision]
+        if aligned_decisions:
+            avg_confidence = sum(d.confidence for d in aligned_decisions) / len(aligned_decisions)
+            print(f"📈 Average confidence from aligned decisions: {avg_confidence:.2f} ({len(aligned_decisions)} models)")
+        else:
+            avg_confidence = sum(d.confidence for d in valid_decisions) / len(valid_decisions)
+            print(f"📈 Average confidence from all decisions: {avg_confidence:.2f}")
         
         # Generate group reasoning
         group_reasoning = self._generate_group_reasoning(valid_decisions, final_decision)
+        print(f"💭 Generated group reasoning: {len(group_reasoning)} characters")
         
         state.group_decision = GroupDecision(
             final_decision=final_decision,
@@ -291,6 +403,9 @@ Respond with JSON format:
             individual_decisions=valid_decisions,
             group_reasoning=group_reasoning
         )
+        
+        print(f"🎉 Group decision created successfully!")
+        print(f"📊 Final result: {final_decision.value.upper()} (confidence: {avg_confidence:.2f}, consensus: {consensus_score:.2f})")
         
         state.verification_complete = True
         return state
@@ -313,6 +428,11 @@ Respond with JSON format:
     async def verify_content(self, content_url: str, content_text: str = "", content_images: List[str] = None) -> GroupDecision:
         """Main method to verify content using the multi-agent system"""
         
+        print(f"🚀 Starting content verification...")
+        print(f"🔗 URL: {content_url}")
+        print(f"📝 Text length: {len(content_text)} characters")
+        print(f"🖼️ Images: {len(content_images) if content_images else 0}")
+        
         if content_images is None:
             content_images = []
         
@@ -323,10 +443,46 @@ Respond with JSON format:
             content_images=content_images
         )
         
+        print(f"📋 Initial state created, starting workflow...")
+        
         # Run the verification workflow
         result = await self.workflow.ainvoke(initial_state)
+        print(f"✅ Workflow completed, processing result...")
         
-        return result.group_decision
+        # Check if result is a dict or VerificationState object
+        print(f"🔍 Result type: {type(result)}")
+        
+        if isinstance(result, dict):
+            print(f"📋 Result is dict, checking for group_decision...")
+            # If it's a dict, extract the group_decision
+            if 'group_decision' in result:
+                print(f"✅ Found group_decision in dict result")
+                return result['group_decision']
+            else:
+                print(f"❌ No group_decision found in dict result, creating fallback")
+                # Create a fallback decision
+                return GroupDecision(
+                    final_decision=VerificationResult.UNCERTAIN,
+                    confidence=0.0,
+                    consensus_score=0.0,
+                    individual_decisions=[],
+                    group_reasoning="Workflow execution failed"
+                )
+        else:
+            print(f"📋 Result is VerificationState object, accessing group_decision...")
+            # If it's a VerificationState object, return the group_decision
+            if hasattr(result, 'group_decision'):
+                print(f"✅ Found group_decision attribute")
+                return result.group_decision
+            else:
+                print(f"❌ No group_decision attribute found, creating fallback")
+                return GroupDecision(
+                    final_decision=VerificationResult.UNCERTAIN,
+                    confidence=0.0,
+                    consensus_score=0.0,
+                    individual_decisions=[],
+                    group_reasoning="Workflow execution failed - no group_decision attribute"
+                )
 
 # Example usage and API endpoint
 async def main():
