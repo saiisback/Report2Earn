@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWalletContext } from '@/contexts/WalletContext';
 import { algodClient, algosToMicroAlgos, SMART_CONTRACT_APP_ID, SMART_CONTRACT_ADDRESS, ESCROW_MNEMONIC } from '@/lib/algorand';
 import algosdk from 'algosdk';
@@ -11,9 +11,14 @@ import { PlaceholdersAndVanishInput } from '@/components/input-front';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { Loader2, ExternalLink, Brain, Shield, CheckCircle, XCircle, AlertTriangle, BarChart3, Users, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import WalletConnection from '@/components/WalletConnection';
+import { MultiStepLoader } from '@/components/step-loader';
+import { BentoGrid, BentoCard } from '@/components/bentogrid';
+import { AnimatePresence, motion } from 'motion/react';
+import { useOutsideClick } from '@/hooks/use-outside-click';
+import { Confetti, ConfettiButton } from '@/components/confetti';
 
 // Smart contract details are imported from lib/algorand.ts
 
@@ -27,6 +32,8 @@ interface VerificationResult {
   confidence: number;
   consensus_score: number;
   group_reasoning: string;
+  popularity_score?: number;
+  dynamic_reward?: number;
   individual_decisions?: Array<{
     agent_name: string;
     decision: 'authentic' | 'fake' | 'uncertain';
@@ -35,6 +42,54 @@ interface VerificationResult {
     evidence: string[];
   }>;
 }
+
+// Type guard to check if verification result is valid
+const isValidVerificationResult = (result: any): result is VerificationResult => {
+  return result && 
+    typeof result === 'object' && 
+    'confidence' in result && 
+    'group_reasoning' in result &&
+    'consensus_score' in result;
+};
+
+// CloseIcon component for expandable cards
+const CloseIcon = () => {
+  return (
+    <motion.svg
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.05 }}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4 text-white"
+    >
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M18 6l-12 12" />
+      <path d="M6 6l12 12" />
+    </motion.svg>
+  );
+};
+
+// Loading states for the step loader
+const loadingStates = [
+  { text: "Connecting to blockchain..." },
+  { text: "Depositing 1 ALGO verification fee..." },
+  { text: "AI agents analyzing content..." },
+  { text: "Analyzing content popularity..." },
+  { text: "Cross-referencing multiple sources..." },
+  { text: "Generating verification report..." },
+  { text: "Calculating dynamic reward..." },
+  { text: "Sending reward transaction..." },
+  { text: "Verification completed!" },
+];
 
 const SmartContractVerificationFlow: React.FC = () => {
   const { isConnected, address, signTransactions, sendTransactions, refreshBalance } = useWalletContext();
@@ -48,7 +103,31 @@ const SmartContractVerificationFlow: React.FC = () => {
   const [isOptedIn, setIsOptedIn] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [triggerVanish, setTriggerVanish] = useState<(() => void) | null>(null);
+  const [showStepLoader, setShowStepLoader] = useState(false);
+  const [activeCard, setActiveCard] = useState<any>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const confettiRef = useRef<any>(null);
 
+  // Handle expandable card functionality
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setActiveCard(null);
+      }
+    }
+
+    if (activeCard) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeCard]);
+
+  useOutsideClick(cardRef, () => setActiveCard(null));
 
   // Check if user is opted in to the smart contract
   const checkOptInStatus = async () => {
@@ -156,6 +235,9 @@ const SmartContractVerificationFlow: React.FC = () => {
     if (triggerVanish) {
       triggerVanish();
     }
+
+    // Show step loader
+    setShowStepLoader(true);
 
     try {
       setError(null);
@@ -267,26 +349,36 @@ const SmartContractVerificationFlow: React.FC = () => {
       // Store verification result for UI display
       setVerificationResult(verificationResult);
       
+      // Trigger confetti if content is fake (user gets reward)
+      if (finalDecision === 'fake') {
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 3000);
+      }
+      
       console.log('AI Verification Result:', {
         decision: finalDecision,
         confidence: verificationResult?.confidence,
         reasoning: verificationResult?.group_reasoning
       });
 
-      // Step 4: Send reward based on verification result
-      // Only send 2 ALGO if content is verified as FAKE
+      // Step 4: Send dynamic reward based on verification result
+      // Only send dynamic reward if content is verified as FAKE
       // No reward for authentic or uncertain results
       if (finalDecision === 'fake') {
         setStatus('claiming');
         
+        // Calculate dynamic reward
+        const dynamicReward = verificationResult?.dynamic_reward || 0.05; // Default to base fee
+        const popularityScore = verificationResult?.popularity_score || 0;
+        
         toast({
           title: "Content verified as FAKE!",
-          description: "Sending 2 ALGO reward (1 original + 1 profit)...",
+          description: `Sending ${dynamicReward.toFixed(4)} ALGO reward (popularity: ${(popularityScore * 100).toFixed(1)}%)...`,
           duration: 3000,
         });
         
         try {
-          const rewardAmount = algosToMicroAlgos(2); // 2 ALGO reward (1 original + 1 profit)
+          const rewardAmount = algosToMicroAlgos(dynamicReward); // Dynamic reward based on popularity
           
           // Create escrow account from mnemonic
           const escrowAccount = algosdk.mnemonicToSecretKey(ESCROW_MNEMONIC);
@@ -311,7 +403,7 @@ const SmartContractVerificationFlow: React.FC = () => {
           
           toast({
             title: "Reward sent!",
-            description: "You received 2 ALGO (1 original + 1 profit) for detecting fake content!",
+            description: `You received ${dynamicReward.toFixed(4)} ALGO for detecting fake content! (Popularity: ${(popularityScore * 100).toFixed(1)}%)`,
             duration: 5000,
           });
         } catch (rewardError: any) {
@@ -343,6 +435,9 @@ const SmartContractVerificationFlow: React.FC = () => {
         variant: "destructive",
         duration: 5000,
       });
+    } finally {
+      // Hide step loader
+      setShowStepLoader(false);
     }
   };
 
@@ -398,12 +493,14 @@ const SmartContractVerificationFlow: React.FC = () => {
       case 'verifying':
         return 'AI agents analyzing content...';
       case 'claiming':
-        return 'Smart contract sending 2 ALGO reward...';
+        return 'Smart contract sending dynamic reward...';
       case 'completed':
         if (verificationResult) {
           const decision = getDecisionValue(verificationResult);
           if (decision === 'fake') {
-            return 'Verification completed! Content is FAKE - You received 2 ALGO (1 original + 1 profit)!';
+            const dynamicReward = verificationResult?.dynamic_reward || 0.05;
+            const popularityScore = verificationResult?.popularity_score || 0;
+            return `Verification completed! Content is FAKE - You received ${dynamicReward.toFixed(4)} ALGO (Popularity: ${(popularityScore * 100).toFixed(1)}%)!`;
           } else if (decision === 'authentic') {
             return 'Verification completed! Content is AUTHENTIC - No reward given.';
           } else {
@@ -448,17 +545,509 @@ const SmartContractVerificationFlow: React.FC = () => {
   }
 
   return (
-    <Card className="bg-white/10 border-white/20 backdrop-blur-sm max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-white flex items-center gap-2">
-          {getStatusIcon()}
-          AI Verification
-        </CardTitle>
-        <CardDescription className="text-white/80">
-          {getStatusText()}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <>
+      {/* Multi Step Loader */}
+      <MultiStepLoader 
+        loadingStates={loadingStates} 
+        loading={showStepLoader} 
+        duration={2000} 
+      />
+
+      {verificationResult && isValidVerificationResult(verificationResult) ? (
+        // Results Display - Expandable Bento Grid
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-8 text-center">
+            <h2 className="text-3xl font-bold text-white mb-2">Verification Results</h2>
+            <p className="text-white/80">AI analysis completed successfully</p>
+          </div>
+          
+          {/* Expandable Card Overlay */}
+          <AnimatePresence>
+            {activeCard && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm h-full w-full z-50"
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Expanded Card */}
+          <AnimatePresence>
+            {activeCard && (
+              <div className="fixed inset-0 grid place-items-center z-[100]">
+                <motion.button
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex absolute top-4 right-4 items-center justify-center bg-black/40 backdrop-blur-md border border-white/20 rounded-full h-10 w-10 z-10 hover:bg-black/60 transition-colors duration-200"
+                  onClick={() => setActiveCard(null)}
+                >
+                  <CloseIcon />
+                </motion.button>
+                <motion.div
+                  layoutId={`card-${activeCard.id}`}
+                  ref={cardRef}
+                  className={`w-full max-w-[800px] h-full md:h-fit md:max-h-[90%] flex flex-col backdrop-blur-md border rounded-3xl overflow-hidden ${
+                    activeCard.decision === 'fake' 
+                      ? 'bg-gradient-to-br from-red-500/20 via-red-600/10 to-red-700/20 border-red-400/30' 
+                      : activeCard.decision === 'authentic'
+                      ? 'bg-gradient-to-br from-green-500/20 via-green-600/10 to-green-700/20 border-green-400/30'
+                      : 'bg-gradient-to-br from-yellow-500/20 via-yellow-600/10 to-yellow-700/20 border-yellow-400/30'
+                  }`}
+                >
+                  <motion.div 
+                    layoutId={`image-${activeCard.id}`}
+                    className={`h-32 w-full ${
+                      activeCard.decision === 'fake' 
+                        ? 'bg-gradient-to-r from-red-500/30 via-red-600/20 to-red-700/30' 
+                        : activeCard.decision === 'authentic'
+                        ? 'bg-gradient-to-r from-green-500/30 via-green-600/20 to-green-700/30'
+                        : 'bg-gradient-to-r from-yellow-500/30 via-yellow-600/20 to-yellow-700/30'
+                    } flex items-center justify-center relative`}
+                  >
+                    {activeCard.Icon && <activeCard.Icon className="h-16 w-16 text-white drop-shadow-lg" />}
+                    {/* Decorative background pattern */}
+                    <div className="absolute inset-0 opacity-10">
+                      <div className="absolute top-4 left-4 w-8 h-8 border border-white/30 rounded-full"></div>
+                      <div className="absolute top-8 right-8 w-4 h-4 border border-white/30 rounded-full"></div>
+                      <div className="absolute bottom-6 left-8 w-6 h-6 border border-white/30 rounded-full"></div>
+                    </div>
+                  </motion.div>
+
+                  <div className="p-6 bg-black/20 backdrop-blur-sm">
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <motion.h3
+                          layoutId={`title-${activeCard.id}`}
+                          className="font-bold text-white text-2xl mb-2"
+                        >
+                          {activeCard.name}
+                        </motion.h3>
+                        <motion.p
+                          layoutId={`description-${activeCard.id}`}
+                          className="text-white/90 text-base"
+                        >
+                          {activeCard.description}
+                        </motion.p>
+                      </div>
+                    </div>
+                    
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="text-white/90 text-sm leading-relaxed max-h-96 overflow-auto"
+                    >
+                      {activeCard.content}
+                    </motion.div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Confetti Effect */}
+          {showConfetti && (
+            <Confetti
+              ref={confettiRef}
+              options={{
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'],
+                shapes: ['star', 'circle'],
+                scalar: 1.2,
+              }}
+            />
+          )}
+
+          {/* Bento Grid with Expandable Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Main Result Card */}
+            <motion.div
+              layoutId={`card-main-result`}
+              onClick={() => setActiveCard({
+                id: 'main-result',
+                name: 'Verification Result',
+                description: `Content verified as ${getDecisionValue(verificationResult).toUpperCase()} with ${Math.round(verificationResult.confidence * 100)}% confidence`,
+                decision: getDecisionValue(verificationResult),
+                Icon: getDecisionValue(verificationResult) === 'fake' ? XCircle : 
+                      getDecisionValue(verificationResult) === 'authentic' ? CheckCircle : AlertTriangle,
+                content: (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Final Decision</h4>
+                      <p className="text-white/80">{getDecisionValue(verificationResult).toUpperCase()}</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Confidence Score</h4>
+                      <p className="text-white/80">{Math.round(verificationResult.confidence * 100)}%</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Consensus Score</h4>
+                      <p className="text-white/80">{Math.round(verificationResult.consensus_score * 100)}%</p>
+                    </div>
+                    {getDecisionValue(verificationResult) === 'fake' && (
+                      <div className="p-4 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-lg backdrop-blur-sm border border-green-500/30">
+                        <h4 className="text-green-200 font-semibold mb-2">🎉 Dynamic Reward Earned!</h4>
+                        <p className="text-green-100 text-sm">
+                          You've earned {verificationResult?.dynamic_reward?.toFixed(4) || '0.0500'} ALGO for identifying fake content!
+                        </p>
+                        <p className="text-green-200 text-xs mt-1">
+                          Popularity Score: {((verificationResult?.popularity_score || 0) * 100).toFixed(1)}% | 
+                          Base Fee: 0.05 ALGO | 
+                          Multiplier: {verificationResult?.dynamic_reward ? (verificationResult.dynamic_reward / 0.05).toFixed(2) : '1.00'}x
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              className={`col-span-2 p-8 rounded-2xl cursor-pointer transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl relative overflow-hidden group ${
+                getDecisionValue(verificationResult) === 'fake' 
+                  ? 'bg-gradient-to-br from-red-500/30 via-red-600/20 to-red-700/30 border border-red-400/40 shadow-red-500/20' 
+                  : getDecisionValue(verificationResult) === 'authentic'
+                  ? 'bg-gradient-to-br from-green-500/30 via-green-600/20 to-green-700/30 border border-green-400/40 shadow-green-500/20'
+                  : 'bg-gradient-to-br from-yellow-500/30 via-yellow-600/20 to-yellow-700/30 border border-yellow-400/40 shadow-yellow-500/20'
+              }`}
+              whileHover={{ y: -5 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {/* Animated background gradient */}
+              <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${
+                getDecisionValue(verificationResult) === 'fake' 
+                  ? 'bg-gradient-to-br from-red-400/20 to-red-600/20' 
+                  : getDecisionValue(verificationResult) === 'authentic'
+                  ? 'bg-gradient-to-br from-green-400/20 to-green-600/20'
+                  : 'bg-gradient-to-br from-yellow-400/20 to-yellow-600/20'
+              }`} />
+              
+              <motion.div 
+                layoutId={`image-main-result`}
+                className={`h-24 w-24 rounded-2xl mb-6 flex items-center justify-center relative z-10 ${
+                  getDecisionValue(verificationResult) === 'fake' 
+                    ? 'bg-gradient-to-br from-red-500/40 to-red-600/40 shadow-lg shadow-red-500/30' 
+                    : getDecisionValue(verificationResult) === 'authentic'
+                    ? 'bg-gradient-to-br from-green-500/40 to-green-600/40 shadow-lg shadow-green-500/30'
+                    : 'bg-gradient-to-br from-yellow-500/40 to-yellow-600/40 shadow-lg shadow-yellow-500/30'
+                }`}
+                whileHover={{ rotate: 5, scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                {getDecisionValue(verificationResult) === 'fake' ? <XCircle className="h-12 w-12 text-white drop-shadow-lg" /> : 
+                 getDecisionValue(verificationResult) === 'authentic' ? <CheckCircle className="h-12 w-12 text-white drop-shadow-lg" /> : 
+                 <AlertTriangle className="h-12 w-12 text-white drop-shadow-lg" />}
+              </motion.div>
+              
+              <motion.h3
+                layoutId={`title-main-result`}
+                className="font-bold text-white text-2xl mb-3 relative z-10"
+              >
+                Verification Result
+              </motion.h3>
+              <motion.p
+                layoutId={`description-main-result`}
+                className="text-white/90 text-base leading-relaxed relative z-10"
+              >
+                Content verified as <span className="font-semibold">{getDecisionValue(verificationResult).toUpperCase()}</span> with <span className="font-semibold text-yellow-300">{Math.round(verificationResult.confidence * 100)}%</span> confidence
+              </motion.p>
+              
+              {/* Decorative elements */}
+              <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-40 transition-opacity duration-300">
+                {getDecisionValue(verificationResult) === 'fake' ? <XCircle className="h-8 w-8 text-white" /> : 
+                 getDecisionValue(verificationResult) === 'authentic' ? <CheckCircle className="h-8 w-8 text-white" /> : 
+                 <AlertTriangle className="h-8 w-8 text-white" />}
+              </div>
+            </motion.div>
+
+            {/* AI Group Analysis Card */}
+            <motion.div
+              layoutId={`card-group-analysis`}
+              onClick={() => setActiveCard({
+                id: 'group-analysis',
+                name: 'AI Group Analysis',
+                description: 'Group Decision: FAKE | Consensus: 4 fake, 0 authentic, 0 uncertain',
+                decision: 'fake',
+                Icon: Brain,
+                content: (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Group Decision</h4>
+                      <p className="text-white/80">FAKE</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Consensus</h4>
+                      <p className="text-white/80">4 fake, 0 authentic, 0 uncertain</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Successful Models</h4>
+                      <p className="text-white/80">4/4</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Confidence Weighted</h4>
+                      <p className="text-white/80">Fake: 3.45, Authentic: 0.00</p>
+                    </div>
+                  </div>
+                )
+              })}
+              className="col-span-1 p-6 rounded-2xl cursor-pointer transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl relative overflow-hidden group bg-gradient-to-br from-blue-500/30 via-indigo-600/20 to-purple-700/30 border border-blue-400/40 shadow-blue-500/20"
+              whileHover={{ y: -5 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {/* Animated background gradient */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-blue-400/20 to-purple-600/20" />
+              
+              <motion.div 
+                layoutId={`image-group-analysis`}
+                className="h-20 w-20 rounded-2xl mb-4 flex items-center justify-center relative z-10 bg-gradient-to-br from-blue-500/40 to-indigo-600/40 shadow-lg shadow-blue-500/30"
+                whileHover={{ rotate: 5, scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <Brain className="h-10 w-10 text-white drop-shadow-lg" />
+              </motion.div>
+              
+              <motion.h3
+                layoutId={`title-group-analysis`}
+                className="font-bold text-white text-xl mb-3 relative z-10"
+              >
+                AI Group Analysis
+              </motion.h3>
+              <motion.p
+                layoutId={`description-group-analysis`}
+                className="text-white/90 text-sm leading-relaxed relative z-10"
+              >
+                Group Decision: <span className="font-semibold text-red-300">FAKE</span> | Consensus: 4 fake, 0 authentic, 0 uncertain
+              </motion.p>
+              
+              {/* Decorative elements */}
+              <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-40 transition-opacity duration-300">
+                <Brain className="h-6 w-6 text-white" />
+              </div>
+            </motion.div>
+
+            {/* Popularity Analysis Card */}
+            <motion.div
+              layoutId={`card-popularity-analysis`}
+              onClick={() => setActiveCard({
+                id: 'popularity-analysis',
+                name: 'Popularity Analysis',
+                description: `Popularity Score: ${((verificationResult?.popularity_score || 0) * 100).toFixed(1)}% | Dynamic Reward: ${verificationResult?.dynamic_reward?.toFixed(4) || '0.0500'} ALGO`,
+                decision: 'fake',
+                Icon: BarChart3,
+                content: (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Popularity Score</h4>
+                      <p className="text-white/80">{((verificationResult?.popularity_score || 0) * 100).toFixed(1)}%</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Dynamic Reward</h4>
+                      <p className="text-white/80">{verificationResult?.dynamic_reward?.toFixed(4) || '0.0500'} ALGO</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Base Fee</h4>
+                      <p className="text-white/80">0.05 ALGO</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Multiplier</h4>
+                      <p className="text-white/80">{verificationResult?.dynamic_reward ? (verificationResult.dynamic_reward / 0.05).toFixed(2) : '1.00'}x</p>
+                    </div>
+                    <div className="p-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg backdrop-blur-sm border border-purple-500/30">
+                      <h4 className="text-purple-200 font-semibold mb-2">💡 How it works</h4>
+                      <p className="text-purple-100 text-sm">Higher popularity content gets higher rewards when detected as fake. Base fee (0.05 ALGO) × popularity multiplier (1.0x - 5.0x)</p>
+                    </div>
+                  </div>
+                )
+              })}
+              className="col-span-1 p-6 rounded-2xl cursor-pointer transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl relative overflow-hidden group bg-gradient-to-br from-purple-500/30 via-pink-600/20 to-rose-700/30 border border-purple-400/40 shadow-purple-500/20"
+              whileHover={{ y: -5 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {/* Animated background gradient */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-purple-400/20 to-pink-600/20" />
+              
+              <motion.div 
+                layoutId={`image-popularity-analysis`}
+                className="h-20 w-20 rounded-2xl mb-4 flex items-center justify-center relative z-10 bg-gradient-to-br from-purple-500/40 to-pink-600/40 shadow-lg shadow-purple-500/30"
+                whileHover={{ rotate: 5, scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <BarChart3 className="h-10 w-10 text-white drop-shadow-lg" />
+              </motion.div>
+              
+              <motion.h3
+                layoutId={`title-popularity-analysis`}
+                className="font-bold text-white text-xl mb-3 relative z-10"
+              >
+                Popularity Analysis
+              </motion.h3>
+              <motion.p
+                layoutId={`description-popularity-analysis`}
+                className="text-white/90 text-sm leading-relaxed relative z-10"
+              >
+                Score: <span className="font-semibold text-purple-300">{((verificationResult?.popularity_score || 0) * 100).toFixed(1)}%</span> | 
+                Reward: <span className="font-semibold text-green-300">{verificationResult?.dynamic_reward?.toFixed(4) || '0.0500'} ALGO</span>
+              </motion.p>
+              
+              {/* Decorative elements */}
+              <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-40 transition-opacity duration-300">
+                <BarChart3 className="h-6 w-6 text-white" />
+              </div>
+            </motion.div>
+
+            {/* Individual Agent Analysis Cards */}
+            {verificationResult.individual_decisions && verificationResult.individual_decisions.map((decision: any, index: number) => (
+              <motion.div
+                key={index}
+                layoutId={`card-agent-${index}`}
+                onClick={() => setActiveCard({
+                  id: `agent-${index}`,
+                  name: decision.agent_name,
+                  description: `${decision.decision.toUpperCase()} (${Math.round(decision.confidence * 100)}%)`,
+                  decision: decision.decision,
+                  Icon: decision.decision === 'fake' ? XCircle : 
+                        decision.decision === 'authentic' ? CheckCircle : AlertTriangle,
+                  content: (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                        <h4 className="text-white font-semibold mb-2">Decision</h4>
+                        <p className="text-white/80">{decision.decision.toUpperCase()}</p>
+                      </div>
+                      <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                        <h4 className="text-white font-semibold mb-2">Confidence</h4>
+                        <p className="text-white/80">{Math.round(decision.confidence * 100)}%</p>
+                      </div>
+                      <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                        <h4 className="text-white font-semibold mb-2">Reasoning</h4>
+                        <p className="text-white/80 text-sm leading-relaxed">{decision.reasoning}</p>
+                      </div>
+                      {decision.evidence && decision.evidence.length > 0 && (
+                        <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                          <h4 className="text-white font-semibold mb-2">Evidence</h4>
+                          <ul className="space-y-1">
+                            {decision.evidence.map((evidence: string, idx: number) => (
+                              <li key={idx} className="text-white/80 text-sm flex items-start gap-2">
+                                <span className="text-white/60 mt-1">•</span>
+                                <span>{evidence}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                className={`p-6 rounded-2xl cursor-pointer transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl relative overflow-hidden group ${
+                  decision.decision === 'fake' 
+                    ? 'bg-gradient-to-br from-red-500/30 via-red-600/20 to-red-700/30 border border-red-400/40 shadow-red-500/20' 
+                    : decision.decision === 'authentic'
+                    ? 'bg-gradient-to-br from-green-500/30 via-green-600/20 to-green-700/30 border border-green-400/40 shadow-green-500/20'
+                    : 'bg-gradient-to-br from-yellow-500/30 via-yellow-600/20 to-yellow-700/30 border border-yellow-400/40 shadow-yellow-500/20'
+                }`}
+                whileHover={{ y: -5 }}
+                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                {/* Animated background gradient */}
+                <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${
+                  decision.decision === 'fake' 
+                    ? 'bg-gradient-to-br from-red-400/20 to-red-600/20' 
+                    : decision.decision === 'authentic'
+                    ? 'bg-gradient-to-br from-green-400/20 to-green-600/20'
+                    : 'bg-gradient-to-br from-yellow-400/20 to-yellow-600/20'
+                }`} />
+                
+                <motion.div 
+                  layoutId={`image-agent-${index}`}
+                  className={`h-16 w-16 rounded-2xl mb-4 flex items-center justify-center relative z-10 ${
+                    decision.decision === 'fake' 
+                      ? 'bg-gradient-to-br from-red-500/40 to-red-600/40 shadow-lg shadow-red-500/30' 
+                      : decision.decision === 'authentic'
+                      ? 'bg-gradient-to-br from-green-500/40 to-green-600/40 shadow-lg shadow-green-500/30'
+                      : 'bg-gradient-to-br from-yellow-500/40 to-yellow-600/40 shadow-lg shadow-yellow-500/30'
+                  }`}
+                  whileHover={{ rotate: 5, scale: 1.1 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  {decision.decision === 'fake' ? <XCircle className="h-8 w-8 text-white drop-shadow-lg" /> : 
+                   decision.decision === 'authentic' ? <CheckCircle className="h-8 w-8 text-white drop-shadow-lg" /> : 
+                   <AlertTriangle className="h-8 w-8 text-white drop-shadow-lg" />}
+                </motion.div>
+                
+                <motion.h3
+                  layoutId={`title-agent-${index}`}
+                  className="font-bold text-white text-lg mb-2 relative z-10"
+                >
+                  {decision.agent_name}
+                </motion.h3>
+                <motion.p
+                  layoutId={`description-agent-${index}`}
+                  className="text-white/90 text-sm leading-relaxed relative z-10"
+                >
+                  <span className={`font-semibold ${
+                    decision.decision === 'fake' ? 'text-red-300' : 
+                    decision.decision === 'authentic' ? 'text-green-300' : 'text-yellow-300'
+                  }`}>
+                    {decision.decision.toUpperCase()}
+                  </span> 
+                  <span className="text-yellow-300 font-semibold"> ({Math.round(decision.confidence * 100)}%)</span> - {decision.reasoning.substring(0, 80)}...
+                </motion.p>
+                
+                {/* Confidence indicator */}
+                <div className="mt-3 relative z-10">
+                  <div className="w-full bg-white/20 rounded-full h-2">
+                    <motion.div 
+                      className={`h-2 rounded-full ${
+                        decision.decision === 'fake' ? 'bg-red-400' : 
+                        decision.decision === 'authentic' ? 'bg-green-400' : 'bg-yellow-400'
+                      }`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${decision.confidence * 100}%` }}
+                      transition={{ delay: 0.5 + index * 0.1, duration: 0.8 }}
+                    />
+                  </div>
+                </div>
+                
+                {/* Decorative elements */}
+                <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-40 transition-opacity duration-300">
+                  {decision.decision === 'fake' ? <XCircle className="h-5 w-5 text-white" /> : 
+                   decision.decision === 'authentic' ? <CheckCircle className="h-5 w-5 text-white" /> : 
+                   <AlertTriangle className="h-5 w-5 text-white" />}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-center gap-4 mt-8">
+            <Button
+              onClick={resetFlow}
+              variant="outline"
+              className="border-white/20 text-black hover:bg-white/10 hover:text-white"
+            >
+              Verify Another Link
+            </Button>
+          </div>
+        </div>
+      ) : (
+        // Input Form
+        <Card className="bg-white/10 border-white/20 backdrop-blur-sm max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              {getStatusIcon()}
+              AI Verification
+            </CardTitle>
+            <CardDescription className="text-white/80">
+              {getStatusText()}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
         {!isOptedIn && (
           <Alert className="border-yellow-500 bg-yellow-500/10">
             <XCircle className="h-4 w-4" />
@@ -552,65 +1141,6 @@ const SmartContractVerificationFlow: React.FC = () => {
               </Alert>
             )}
 
-            {verificationResult && (
-              <Alert className={`${
-                getDecisionValue(verificationResult) === 'authentic' 
-                  ? 'border-green-500 bg-green-500/10' 
-                  : getDecisionValue(verificationResult) === 'fake'
-                  ? 'border-red-500 bg-red-500/10'
-                  : 'border-yellow-500 bg-yellow-500/10'
-              }`}>
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription className={`${
-                  getDecisionValue(verificationResult) === 'authentic' 
-                    ? 'text-green-200' 
-                    : getDecisionValue(verificationResult) === 'fake'
-                    ? 'text-red-200'
-                    : 'text-yellow-200'
-                }`}>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">AI Verification Result:</span>
-                      <Badge variant="secondary" className={
-                        getDecisionValue(verificationResult) === 'authentic' 
-                          ? 'bg-green-600 text-white' 
-                          : getDecisionValue(verificationResult) === 'fake'
-                          ? 'bg-red-600 text-white'
-                          : 'bg-yellow-600 text-white'
-                      }>
-                        {getDecisionValue(verificationResult).toUpperCase()}
-                      </Badge>
-                      <span className="text-sm">
-                        (Confidence: {Math.round(verificationResult.confidence * 100)}%)
-                      </span>
-                    </div>
-                    <p className="text-sm">{verificationResult.group_reasoning}</p>
-                    {getDecisionValue(verificationResult) === 'fake' && (
-                      <p className="text-sm font-medium text-green-200">✅ Reward: 2 ALGO (1 original + 1 profit) - Content is FAKE!</p>
-                    )}
-                    {(getDecisionValue(verificationResult) === 'authentic' || getDecisionValue(verificationResult) === 'uncertain') && (
-                      <p className="text-sm font-medium text-yellow-200">No reward given - Content is {getDecisionValue(verificationResult).toUpperCase()}</p>
-                    )}
-                    {verificationResult.individual_decisions && verificationResult.individual_decisions.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        <p className="text-xs font-medium">Individual Agent Decisions:</p>
-                        <div className="space-y-1">
-                          {verificationResult.individual_decisions.map((decision, index) => (
-                            <div key={index} className="text-xs flex items-center gap-2">
-                              <span className="font-medium">{decision.agent_name}:</span>
-                              <Badge variant="outline" className="text-xs px-1 py-0">
-                                {decision.decision.toUpperCase()}
-                              </Badge>
-                              <span>({Math.round(decision.confidence * 100)}%)</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
 
             {claimTxId && (
               <Alert className="border-green-500 bg-green-500/10">
@@ -637,7 +1167,7 @@ const SmartContractVerificationFlow: React.FC = () => {
                 disabled={status !== 'idle' || !link.trim()}
                 className="w-40 bg-white text-black hover:bg-gray-100 font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
-                {status === 'idle' ? 'Start (1 ALGO)' : getStatusText()}
+                {status === 'idle' ? 'Verify (1 ALGO)' : getStatusText()}
               </InteractiveHoverButton>
               
               {(status === 'completed' || status === 'error') && (
@@ -652,8 +1182,10 @@ const SmartContractVerificationFlow: React.FC = () => {
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      )}
+    </>
   );
 };
 
