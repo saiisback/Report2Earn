@@ -20,6 +20,10 @@ from pydantic import BaseModel, Field
 import httpx
 from dotenv import load_dotenv
 
+# Import our custom modules
+from image_processor import ImageProcessor
+from content_scraper import ContentScraper
+
 # Load environment variables
 load_dotenv()
 
@@ -43,6 +47,8 @@ class GroupDecision:
     consensus_score: float
     individual_decisions: List[AgentDecision]
     group_reasoning: str
+    popularity_score: float = 0.0
+    dynamic_reward: float = 0.0
 
 class VerificationState(BaseModel):
     content_url: str
@@ -50,11 +56,20 @@ class VerificationState(BaseModel):
     content_images: List[str] = []
     metadata: Dict[str, Any] = {}
     
+    # Image analysis results
+    image_analyses: List[Dict[str, Any]] = []
+    extracted_texts: List[str] = []
+    manipulation_indicators: List[Dict[str, Any]] = []
+    
     # Agent decisions
     fact_checker_decision: Optional[AgentDecision] = None
     image_analyst_decision: Optional[AgentDecision] = None
     source_verifier_decision: Optional[AgentDecision] = None
     context_analyst_decision: Optional[AgentDecision] = None
+    
+    # Popularity and engagement data
+    popularity_score: float = 0.0
+    engagement_metrics: Dict[str, Any] = {}
     
     # Final result
     group_decision: Optional[GroupDecision] = None
@@ -62,6 +77,10 @@ class VerificationState(BaseModel):
 
 class AgenticVerificationSystem:
     def __init__(self):
+        # Initialize image processor and content scraper
+        self.image_processor = ImageProcessor()
+        self.content_scraper = ContentScraper()
+        
         # Initialize multiple OpenRouter clients using free models
         self.models = {
             "nvidia_nemotron": ChatOpenAI(
@@ -115,15 +134,89 @@ class AgenticVerificationSystem:
         workflow = StateGraph(VerificationState)
         
         # Add nodes for each verification step using multiple models
+        workflow.add_node("image_processing", self._process_images)
         workflow.add_node("multi_model_verification", self._multi_model_verification)
+        workflow.add_node("popularity_analysis", self._analyze_popularity)
         workflow.add_node("group_decision", self._group_decision_maker)
         
         # Define the flow
-        workflow.set_entry_point("multi_model_verification")
-        workflow.add_edge("multi_model_verification", "group_decision")
+        workflow.set_entry_point("image_processing")
+        workflow.add_edge("image_processing", "multi_model_verification")
+        workflow.add_edge("multi_model_verification", "popularity_analysis")
+        workflow.add_edge("popularity_analysis", "group_decision")
         workflow.add_edge("group_decision", END)
         
         return workflow.compile()
+    
+    async def _process_images(self, state: VerificationState) -> VerificationState:
+        """Process images using Groq vision models"""
+        
+        print(f"🖼️ Starting image processing for {len(state.content_images)} images...")
+        
+        if not state.content_images:
+            print("📝 No images to process")
+            return state
+        
+        try:
+            # Process all images in batch
+            image_results = await self.image_processor.analyze_images_batch(
+                state.content_images,
+                analysis_prompt="""Analyze this image for content verification purposes. Focus on:
+1. What objects, people, or scenes are visible
+2. Any text or writing in the image
+3. The overall context and setting
+4. Any potential signs of manipulation or editing
+5. The emotional tone or mood
+6. Any notable details that could be relevant for content verification
+7. Whether the image appears to be AI-generated or manipulated
+
+Provide a detailed analysis that can help determine the authenticity of the content."""
+            )
+            
+            # Store image analysis results
+            state.image_analyses = image_results
+            
+            # Extract text from images
+            extracted_texts = []
+            manipulation_indicators = []
+            
+            for i, image_url in enumerate(state.content_images):
+                print(f"🔍 Processing image {i+1}/{len(state.content_images)}: {image_url}")
+                
+                # Encode image for text extraction and manipulation detection
+                image_data = self.image_processor.encode_image_from_url(image_url)
+                if image_data:
+                    # Extract text
+                    text_result = self.image_processor.extract_text_from_image(image_data)
+                    if text_result["success"]:
+                        extracted_texts.append(text_result["extracted_text"])
+                        print(f"📝 Extracted text: {text_result['extracted_text'][:100]}...")
+                    
+                    # Detect manipulation
+                    manipulation_result = self.image_processor.detect_manipulation_indicators(image_data)
+                    if manipulation_result["success"]:
+                        manipulation_indicators.append({
+                            "image_url": image_url,
+                            "analysis": manipulation_result["manipulation_analysis"]
+                        })
+                        print(f"🔍 Manipulation analysis: {manipulation_result['manipulation_analysis'][:100]}...")
+            
+            state.extracted_texts = extracted_texts
+            state.manipulation_indicators = manipulation_indicators
+            
+            # Combine extracted text with content text
+            if extracted_texts:
+                combined_text = state.content_text + "\n\n[Text from images:]\n" + "\n".join(extracted_texts)
+                state.content_text = combined_text
+                print(f"📝 Combined text length: {len(state.content_text)} characters")
+            
+            print(f"✅ Image processing completed: {len(image_results)} analyses, {len(extracted_texts)} text extractions, {len(manipulation_indicators)} manipulation checks")
+            
+        except Exception as e:
+            print(f"❌ Image processing failed: {e}")
+            # Continue with verification even if image processing fails
+        
+        return state
     
     async def _multi_model_verification(self, state: VerificationState) -> VerificationState:
         """Multi-model verification using all 5 free OpenRouter models"""
@@ -131,6 +224,20 @@ class AgenticVerificationSystem:
         print(f"🔍 Starting multi-model verification for URL: {state.content_url}")
         print(f"📝 Content text length: {len(state.content_text)} characters")
         print(f"🖼️ Images count: {len(state.content_images) if state.content_images else 0}")
+        
+        # Create verification prompt with image analysis
+        image_analysis_text = ""
+        if state.image_analyses:
+            image_analysis_text = "\n\n[Image Analysis Results:]\n"
+            for i, analysis in enumerate(state.image_analyses):
+                if analysis.get("success"):
+                    image_analysis_text += f"Image {i+1}: {analysis.get('analysis', 'No analysis available')}\n"
+        
+        manipulation_text = ""
+        if state.manipulation_indicators:
+            manipulation_text = "\n\n[Manipulation Detection Results:]\n"
+            for i, indicator in enumerate(state.manipulation_indicators):
+                manipulation_text += f"Image {i+1}: {indicator.get('analysis', 'No analysis available')}\n"
         
         # Create verification prompt
         prompt = ChatPromptTemplate.from_messages([
@@ -140,8 +247,10 @@ Your analysis should cover:
 1. Factual accuracy and logical consistency
 2. Source credibility and attribution
 3. Context and timing relevance
-4. Potential manipulation indicators
+4. Potential manipulation indicators (including image manipulation)
 5. Overall authenticity assessment
+6. Image content analysis and text extraction results
+7. Any signs of AI-generated or manipulated content
 
 IMPORTANT: You MUST respond with ONLY valid JSON in this exact format:
 {
@@ -157,7 +266,7 @@ Do not include any text outside the JSON object."""),
             HumanMessage(content=f"""Content to verify:
 URL: {state.content_url}
 Text: {state.content_text}
-Images: {state.content_images if state.content_images else "None"}
+Images: {state.content_images if state.content_images else "None"}{image_analysis_text}{manipulation_text}
 
 Analyze this content and respond with ONLY the JSON format specified above.""")
         ])
@@ -234,6 +343,118 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
         state.context_analyst_decision = decisions[3] if len(decisions) > 3 else None
         
         return state
+    
+    async def _analyze_popularity(self, state: VerificationState) -> VerificationState:
+        """Analyze content popularity and engagement metrics"""
+        
+        print(f"📊 Analyzing popularity for URL: {state.content_url}")
+        
+        try:
+            # Simulate popularity analysis based on content characteristics
+            # In a real implementation, this would analyze social media metrics,
+            # view counts, shares, etc.
+            
+            popularity_score = await self._calculate_popularity_score(state)
+            state.popularity_score = popularity_score
+            
+            # Store engagement metrics
+            state.engagement_metrics = {
+                "estimated_views": int(popularity_score * 10000),  # Simulate view count
+                "estimated_shares": int(popularity_score * 1000),   # Simulate share count
+                "estimated_engagement": popularity_score,
+                "content_virality": "high" if popularity_score > 0.7 else "medium" if popularity_score > 0.4 else "low"
+            }
+            
+            print(f"📈 Popularity score: {popularity_score:.2f}")
+            print(f"📊 Engagement metrics: {state.engagement_metrics}")
+            
+        except Exception as e:
+            print(f"❌ Popularity analysis failed: {e}")
+            state.popularity_score = 0.5  # Default moderate popularity
+            state.engagement_metrics = {
+                "estimated_views": 5000,
+                "estimated_shares": 500,
+                "estimated_engagement": 0.5,
+                "content_virality": "medium"
+            }
+        
+        return state
+    
+    async def _calculate_popularity_score(self, state: VerificationState) -> float:
+        """Calculate popularity score based on content analysis"""
+        
+        # Analyze content characteristics that might indicate popularity
+        content_text = state.content_text.lower()
+        
+        # Keywords that suggest viral content
+        viral_keywords = [
+            "breaking", "exclusive", "shocking", "amazing", "incredible", 
+            "unbelievable", "must see", "viral", "trending", "hot",
+            "urgent", "alert", "warning", "scandal", "leaked"
+        ]
+        
+        # Count viral keywords
+        viral_count = sum(1 for keyword in viral_keywords if keyword in content_text)
+        
+        # Analyze content length (medium length content tends to be more shareable)
+        text_length = len(state.content_text)
+        length_score = 0.5  # Default
+        if 100 <= text_length <= 500:
+            length_score = 0.8  # Optimal length
+        elif 50 <= text_length <= 1000:
+            length_score = 0.6  # Good length
+        elif text_length > 1000:
+            length_score = 0.4  # Too long
+        
+        # Analyze emotional content
+        emotional_keywords = [
+            "love", "hate", "angry", "excited", "scared", "surprised",
+            "disgusted", "happy", "sad", "furious", "thrilled"
+        ]
+        emotional_count = sum(1 for keyword in emotional_keywords if keyword in content_text)
+        
+        # Calculate base popularity score
+        base_score = 0.3  # Base score
+        
+        # Add viral keyword bonus
+        viral_bonus = min(viral_count * 0.1, 0.3)  # Max 0.3 bonus
+        
+        # Add emotional content bonus
+        emotional_bonus = min(emotional_count * 0.05, 0.2)  # Max 0.2 bonus
+        
+        # Add length score
+        length_bonus = length_score * 0.2
+        
+        # Calculate final score
+        popularity_score = base_score + viral_bonus + emotional_bonus + length_bonus
+        
+        # Ensure score is between 0 and 1
+        popularity_score = max(0.0, min(1.0, popularity_score))
+        
+        print(f"🔍 Popularity analysis: viral={viral_count}, emotional={emotional_count}, length={text_length}")
+        print(f"📊 Score breakdown: base={base_score:.2f}, viral={viral_bonus:.2f}, emotional={emotional_bonus:.2f}, length={length_bonus:.2f}")
+        
+        return popularity_score
+    
+    def _calculate_dynamic_reward(self, popularity_score: float) -> float:
+        """Calculate dynamic reward based on popularity score"""
+        
+        # Base fee: 0.05 ALGO
+        base_fee = 0.05
+        
+        # Popularity multiplier: 1.0 to 5.0 based on popularity score
+        # Higher popularity = higher multiplier
+        popularity_multiplier = 1.0 + (popularity_score * 4.0)  # Range: 1.0 to 5.0
+        
+        # Calculate dynamic reward
+        dynamic_reward = base_fee * popularity_multiplier
+        
+        # Cap the maximum reward at 1.0 ALGO to prevent excessive rewards
+        dynamic_reward = min(dynamic_reward, 1.0)
+        
+        print(f"💰 Reward calculation: base={base_fee:.3f}, multiplier={popularity_multiplier:.2f}, final={dynamic_reward:.4f}")
+        
+        return dynamic_reward
     
     async def _verify_with_model_safe(self, client, model_name, prompt, state):
         """Safely verify content with a specific model, handling timeouts and errors"""
@@ -473,6 +694,12 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
         
         print(f"🎯 Final consensus score: {consensus_score:.2f}")
         
+        # Calculate dynamic reward if content is fake
+        dynamic_reward = 0.0
+        if final_decision == VerificationResult.FAKE:
+            dynamic_reward = self._calculate_dynamic_reward(state.popularity_score)
+            print(f"💰 Dynamic reward calculated: {dynamic_reward:.4f} ALGO (popularity: {state.popularity_score:.2f})")
+        
         # Generate group reasoning
         group_reasoning = self._generate_group_reasoning(valid_decisions, final_decision)
         print(f"💭 Generated group reasoning: {len(group_reasoning)} characters")
@@ -482,7 +709,9 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
             confidence=avg_confidence,
             consensus_score=consensus_score,
             individual_decisions=valid_decisions,
-            group_reasoning=group_reasoning
+            group_reasoning=group_reasoning,
+            popularity_score=state.popularity_score,
+            dynamic_reward=dynamic_reward
         )
         
         print(f"🎉 Group decision created successfully!")
@@ -535,11 +764,26 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
         
         print(f"🚀 Starting content verification...")
         print(f"🔗 URL: {content_url}")
-        print(f"📝 Text length: {len(content_text)} characters")
-        print(f"🖼️ Images: {len(content_images) if content_images else 0}")
+        
+        # If no content provided, try to scrape it
+        if not content_text and not content_images:
+            print(f"📥 No content provided, attempting to scrape from URL...")
+            try:
+                scraped_data = self.content_scraper.scrape_content(content_url)
+                if "error" not in scraped_data:
+                    content_text = scraped_data.get("content_text", "")
+                    content_images = scraped_data.get("content_images", [])
+                    print(f"✅ Scraped content: {len(content_text)} chars, {len(content_images)} images")
+                else:
+                    print(f"❌ Scraping failed: {scraped_data['error']}")
+            except Exception as e:
+                print(f"❌ Scraping error: {e}")
         
         if content_images is None:
             content_images = []
+        
+        print(f"📝 Text length: {len(content_text)} characters")
+        print(f"🖼️ Images: {len(content_images)}")
         
         # Create initial state
         initial_state = VerificationState(
@@ -588,6 +832,11 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
                     individual_decisions=[],
                     group_reasoning="Workflow execution failed - no group_decision attribute"
                 )
+    
+    def cleanup(self):
+        """Cleanup resources"""
+        if hasattr(self, 'content_scraper'):
+            self.content_scraper.close()
 
 # Example usage and API endpoint
 async def main():
@@ -596,22 +845,32 @@ async def main():
     # Initialize the system
     verifier = AgenticVerificationSystem()
     
-    # Example content to verify
-    content_url = "https://example.com/fake-news"
-    content_text = "Breaking: Scientists discover that the Earth is actually flat and all space agencies have been lying to us for decades."
-    
-    # Verify the content
-    result = await verifier.verify_content(
-        content_url=content_url,
-        content_text=content_text,
-        content_images=[]
-    )
-    
-    print("=== VERIFICATION RESULT ===")
-    print(f"Final Decision: {result.final_decision.value.upper()}")
-    print(f"Confidence: {result.confidence:.2f}")
-    print(f"Consensus Score: {result.consensus_score:.2f}")
-    print(f"\nGroup Reasoning:\n{result.group_reasoning}")
+    try:
+        # Example content to verify with images
+        content_url = "https://example.com/fake-news"
+        content_text = "Breaking: Scientists discover that the Earth is actually flat and all space agencies have been lying to us for decades."
+        content_images = [
+            "https://upload.wikimedia.org/wikipedia/commons/f/f2/LPU-v1-die.jpg"
+        ]
+        
+        # Verify the content
+        result = await verifier.verify_content(
+            content_url=content_url,
+            content_text=content_text,
+            content_images=content_images
+        )
+        
+        print("=== VERIFICATION RESULT ===")
+        print(f"Final Decision: {result.final_decision.value.upper()}")
+        print(f"Confidence: {result.confidence:.2f}")
+        print(f"Consensus Score: {result.consensus_score:.2f}")
+        print(f"Popularity Score: {result.popularity_score:.2f}")
+        print(f"Dynamic Reward: {result.dynamic_reward:.4f} ALGO")
+        print(f"\nGroup Reasoning:\n{result.group_reasoning}")
+        
+    finally:
+        # Cleanup resources
+        verifier.cleanup()
 
 if __name__ == "__main__":
     asyncio.run(main())

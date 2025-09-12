@@ -298,7 +298,7 @@ const SmartContractVerificationFlow: React.FC = () => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout for AI processing
         
-        const apiResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/scrape-and-verify`, {
+        const apiResponse = await fetch(`${process.env.NEXT_PUBLIC_AI_VERIFY_API_URL || 'http://localhost:8000'}/scrape-and-verify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: link }),

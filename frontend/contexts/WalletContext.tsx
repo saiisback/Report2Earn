@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { PeraWalletConnect } from '@perawallet/connect';
 import { algodClient, formatAddress, microAlgosToAlgos } from '@/lib/algorand';
+import { getNetworkConfig } from '@/config/networks';
 
 interface WalletContextType {
   isConnected: boolean;
@@ -35,8 +36,9 @@ const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   useEffect(() => {
     console.log('Initializing Pera Wallet...');
+    const networkConfig = getNetworkConfig();
     const peraWalletConnect = new PeraWalletConnect({
-      chainId: 416002, // Testnet
+      chainId: networkConfig.chainId,
     });
 
     setPeraWallet(peraWalletConnect);
