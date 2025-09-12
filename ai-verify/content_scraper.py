@@ -75,12 +75,15 @@ class ContentScraper:
             chrome_options.add_argument("--window-size=1920,1080")
             chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
             
-            # For Railway/Linux environment
-            if os.getenv('RAILWAY_ENVIRONMENT'):
+            # For Docker/Railway environment
+            if os.getenv('RAILWAY_ENVIRONMENT') or os.path.exists('/.dockerenv'):
                 chrome_options.binary_location = "/usr/bin/google-chrome"
-                print("Railway environment detected, using system Chrome")
+                chrome_driver_path = "/usr/local/bin/chromedriver"
+                print("Docker/Railway environment detected, using system Chrome and ChromeDriver")
+                service = Service(chrome_driver_path)
+            else:
+                service = Service(ChromeDriverManager().install())
             
-            service = Service(ChromeDriverManager().install())
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             print("Chrome driver initialized successfully")
         except Exception as e:
