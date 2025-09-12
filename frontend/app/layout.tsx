@@ -6,7 +6,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Instrument_Serif } from "next/font/google"
 import { Suspense } from "react"
 import "./globals.css"
-import { Navbar } from "@/components/navbar"
+import { NavbarComponent } from "@/components/navbar"
 import { WalletProvider } from "@/contexts/WalletContext"
 
 const instrumentSerif = Instrument_Serif({
@@ -32,7 +32,7 @@ export default function RootLayout({
     <html lang="en" className={`${instrumentSerif.variable} antialiased`}>
       <body className={`${instrumentSerif.variable} antialiased`}>
         <WalletProvider>
-          <Navbar />
+          <NavbarComponent />
           <Suspense fallback={null}>{children}</Suspense>
           <Analytics />
         </WalletProvider>

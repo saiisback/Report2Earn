@@ -2,7 +2,7 @@
 
 import { GradientBackground } from "@/components/gradient-background"
 import { Instrument_Serif } from "next/font/google"
-import { Navbar } from "@/components/navbar"
+import { NavbarComponent } from "@/components/navbar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useWalletContext } from "@/contexts/WalletContext"
@@ -230,7 +230,7 @@ export default function VerifyPage() {
 
   return (
     <div className="min-h-screen">
-      <Navbar />
+        <NavbarComponent />
       <main className="relative min-h-screen overflow-hidden pt-20">
         <GradientBackground />
         <div className="absolute inset-0 -z-10 bg-black/20" />
