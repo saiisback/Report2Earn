@@ -48,7 +48,7 @@ export default function CommunityPage() {
                 <CardHeader>
                   <CardTitle className="text-white text-lg flex items-center gap-2">
                     <Target className="h-5 w-5 text-red-300" />
-                    Active Bounties
+                    Active Bounty
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="h-full">
