@@ -47,4 +47,4 @@ ENV PYTHONPATH=/app
 ENV RAILWAY_ENVIRONMENT=true
 
 # Start command
-CMD ["uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
