@@ -32,6 +32,8 @@ interface VerificationResult {
   confidence: number;
   consensus_score: number;
   group_reasoning: string;
+  popularity_score?: number;
+  dynamic_reward?: number;
   individual_decisions?: Array<{
     agent_name: string;
     decision: 'authentic' | 'fake' | 'uncertain';
@@ -79,11 +81,12 @@ const CloseIcon = () => {
 // Loading states for the step loader
 const loadingStates = [
   { text: "Connecting to blockchain..." },
-  { text: "Depositing 1 ALGO to smart contract..." },
+  { text: "Depositing 1 ALGO verification fee..." },
   { text: "AI agents analyzing content..." },
+  { text: "Analyzing content popularity..." },
   { text: "Cross-referencing multiple sources..." },
   { text: "Generating verification report..." },
-  { text: "Processing smart contract logic..." },
+  { text: "Calculating dynamic reward..." },
   { text: "Sending reward transaction..." },
   { text: "Verification completed!" },
 ];
@@ -358,20 +361,24 @@ const SmartContractVerificationFlow: React.FC = () => {
         reasoning: verificationResult?.group_reasoning
       });
 
-      // Step 4: Send reward based on verification result
-      // Only send 2 ALGO if content is verified as FAKE
+      // Step 4: Send dynamic reward based on verification result
+      // Only send dynamic reward if content is verified as FAKE
       // No reward for authentic or uncertain results
       if (finalDecision === 'fake') {
         setStatus('claiming');
         
+        // Calculate dynamic reward
+        const dynamicReward = verificationResult?.dynamic_reward || 0.05; // Default to base fee
+        const popularityScore = verificationResult?.popularity_score || 0;
+        
         toast({
           title: "Content verified as FAKE!",
-          description: "Sending 2 ALGO reward (1 original + 1 profit)...",
+          description: `Sending ${dynamicReward.toFixed(4)} ALGO reward (popularity: ${(popularityScore * 100).toFixed(1)}%)...`,
           duration: 3000,
         });
         
         try {
-          const rewardAmount = algosToMicroAlgos(2); // 2 ALGO reward (1 original + 1 profit)
+          const rewardAmount = algosToMicroAlgos(dynamicReward); // Dynamic reward based on popularity
           
           // Create escrow account from mnemonic
           const escrowAccount = algosdk.mnemonicToSecretKey(ESCROW_MNEMONIC);
@@ -396,7 +403,7 @@ const SmartContractVerificationFlow: React.FC = () => {
           
           toast({
             title: "Reward sent!",
-            description: "You received 2 ALGO (1 original + 1 profit) for detecting fake content!",
+            description: `You received ${dynamicReward.toFixed(4)} ALGO for detecting fake content! (Popularity: ${(popularityScore * 100).toFixed(1)}%)`,
             duration: 5000,
           });
         } catch (rewardError: any) {
@@ -486,12 +493,14 @@ const SmartContractVerificationFlow: React.FC = () => {
       case 'verifying':
         return 'AI agents analyzing content...';
       case 'claiming':
-        return 'Smart contract sending 2 ALGO reward...';
+        return 'Smart contract sending dynamic reward...';
       case 'completed':
         if (verificationResult) {
           const decision = getDecisionValue(verificationResult);
           if (decision === 'fake') {
-            return 'Verification completed! Content is FAKE - You received 2 ALGO (1 original + 1 profit)!';
+            const dynamicReward = verificationResult?.dynamic_reward || 0.05;
+            const popularityScore = verificationResult?.popularity_score || 0;
+            return `Verification completed! Content is FAKE - You received ${dynamicReward.toFixed(4)} ALGO (Popularity: ${(popularityScore * 100).toFixed(1)}%)!`;
           } else if (decision === 'authentic') {
             return 'Verification completed! Content is AUTHENTIC - No reward given.';
           } else {
@@ -684,8 +693,15 @@ const SmartContractVerificationFlow: React.FC = () => {
                     </div>
                     {getDecisionValue(verificationResult) === 'fake' && (
                       <div className="p-4 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-lg backdrop-blur-sm border border-green-500/30">
-                        <h4 className="text-green-200 font-semibold mb-2">🎉 Reward Earned!</h4>
-                        <p className="text-green-100 text-sm">You've earned 2 ALGO for identifying fake content!</p>
+                        <h4 className="text-green-200 font-semibold mb-2">🎉 Dynamic Reward Earned!</h4>
+                        <p className="text-green-100 text-sm">
+                          You've earned {verificationResult?.dynamic_reward?.toFixed(4) || '0.0500'} ALGO for identifying fake content!
+                        </p>
+                        <p className="text-green-200 text-xs mt-1">
+                          Popularity Score: {((verificationResult?.popularity_score || 0) * 100).toFixed(1)}% | 
+                          Base Fee: 0.05 ALGO | 
+                          Multiplier: {verificationResult?.dynamic_reward ? (verificationResult.dynamic_reward / 0.05).toFixed(2) : '1.00'}x
+                        </p>
                       </div>
                     )}
                   </div>
@@ -810,6 +826,76 @@ const SmartContractVerificationFlow: React.FC = () => {
               {/* Decorative elements */}
               <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-40 transition-opacity duration-300">
                 <Brain className="h-6 w-6 text-white" />
+              </div>
+            </motion.div>
+
+            {/* Popularity Analysis Card */}
+            <motion.div
+              layoutId={`card-popularity-analysis`}
+              onClick={() => setActiveCard({
+                id: 'popularity-analysis',
+                name: 'Popularity Analysis',
+                description: `Popularity Score: ${((verificationResult?.popularity_score || 0) * 100).toFixed(1)}% | Dynamic Reward: ${verificationResult?.dynamic_reward?.toFixed(4) || '0.0500'} ALGO`,
+                decision: 'fake',
+                Icon: BarChart3,
+                content: (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Popularity Score</h4>
+                      <p className="text-white/80">{((verificationResult?.popularity_score || 0) * 100).toFixed(1)}%</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Dynamic Reward</h4>
+                      <p className="text-white/80">{verificationResult?.dynamic_reward?.toFixed(4) || '0.0500'} ALGO</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Base Fee</h4>
+                      <p className="text-white/80">0.05 ALGO</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Multiplier</h4>
+                      <p className="text-white/80">{verificationResult?.dynamic_reward ? (verificationResult.dynamic_reward / 0.05).toFixed(2) : '1.00'}x</p>
+                    </div>
+                    <div className="p-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg backdrop-blur-sm border border-purple-500/30">
+                      <h4 className="text-purple-200 font-semibold mb-2">💡 How it works</h4>
+                      <p className="text-purple-100 text-sm">Higher popularity content gets higher rewards when detected as fake. Base fee (0.05 ALGO) × popularity multiplier (1.0x - 5.0x)</p>
+                    </div>
+                  </div>
+                )
+              })}
+              className="col-span-1 p-6 rounded-2xl cursor-pointer transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl relative overflow-hidden group bg-gradient-to-br from-purple-500/30 via-pink-600/20 to-rose-700/30 border border-purple-400/40 shadow-purple-500/20"
+              whileHover={{ y: -5 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {/* Animated background gradient */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-purple-400/20 to-pink-600/20" />
+              
+              <motion.div 
+                layoutId={`image-popularity-analysis`}
+                className="h-20 w-20 rounded-2xl mb-4 flex items-center justify-center relative z-10 bg-gradient-to-br from-purple-500/40 to-pink-600/40 shadow-lg shadow-purple-500/30"
+                whileHover={{ rotate: 5, scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <BarChart3 className="h-10 w-10 text-white drop-shadow-lg" />
+              </motion.div>
+              
+              <motion.h3
+                layoutId={`title-popularity-analysis`}
+                className="font-bold text-white text-xl mb-3 relative z-10"
+              >
+                Popularity Analysis
+              </motion.h3>
+              <motion.p
+                layoutId={`description-popularity-analysis`}
+                className="text-white/90 text-sm leading-relaxed relative z-10"
+              >
+                Score: <span className="font-semibold text-purple-300">{((verificationResult?.popularity_score || 0) * 100).toFixed(1)}%</span> | 
+                Reward: <span className="font-semibold text-green-300">{verificationResult?.dynamic_reward?.toFixed(4) || '0.0500'} ALGO</span>
+              </motion.p>
+              
+              {/* Decorative elements */}
+              <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-40 transition-opacity duration-300">
+                <BarChart3 className="h-6 w-6 text-white" />
               </div>
             </motion.div>
 
@@ -1081,7 +1167,7 @@ const SmartContractVerificationFlow: React.FC = () => {
                 disabled={status !== 'idle' || !link.trim()}
                 className="w-40 bg-white text-black hover:bg-gray-100 font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
-                {status === 'idle' ? 'Start (1 ALGO)' : getStatusText()}
+                {status === 'idle' ? 'Verify (1 ALGO)' : getStatusText()}
               </InteractiveHoverButton>
               
               {(status === 'completed' || status === 'error') && (
