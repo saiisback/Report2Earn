@@ -5,7 +5,6 @@ import { Instrument_Serif } from "next/font/google"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { NetworkStatus } from "@/components/NetworkStatus"
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -16,11 +15,6 @@ const instrumentSerif = Instrument_Serif({
 export default function Page() {
   return (
     <div className="min-h-screen">
-      {/* Network Status */}
-      <div className="absolute top-4 right-4 z-50">
-        <NetworkStatus />
-      </div>
-      
       <main className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <GradientBackground />
         <div className="absolute inset-0 -z-10 bg-black/20" />
