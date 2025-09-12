@@ -5,8 +5,9 @@ import { useWalletContext } from '@/contexts/WalletContext';
 import { algodClient, algosToMicroAlgos, SMART_CONTRACT_APP_ID, SMART_CONTRACT_ADDRESS, ESCROW_MNEMONIC } from '@/lib/algorand';
 import algosdk from 'algosdk';
 import { Button } from '@/components/ui/button';
+import { InteractiveHoverButton } from '@/components/special-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { PlaceholdersAndVanishInput } from '@/components/input-front';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -45,6 +46,7 @@ const SmartContractVerificationFlow: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isOptedIn, setIsOptedIn] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const [triggerVanish, setTriggerVanish] = useState<(() => void) | null>(null);
 
 
   // Check if user is opted in to the smart contract
@@ -147,6 +149,11 @@ const SmartContractVerificationFlow: React.FC = () => {
     if (!signTransactions || !sendTransactions) {
       setError('Wallet functions not available. Please refresh the page.');
       return;
+    }
+
+    // Trigger vanish effect
+    if (triggerVanish) {
+      triggerVanish();
     }
 
     try {
@@ -437,18 +444,17 @@ const SmartContractVerificationFlow: React.FC = () => {
   }
 
   return (
-    <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+    <Card className="bg-white/10 border-white/20 backdrop-blur-sm max-w-md mx-auto">
       <CardHeader>
         <CardTitle className="text-white flex items-center gap-2">
           {getStatusIcon()}
-          Smart Contract Verification
+          AI Verification
         </CardTitle>
         <CardDescription className="text-white/80">
           {getStatusText()}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-
         {!isOptedIn && (
           <Alert className="border-yellow-500 bg-yellow-500/10">
             <XCircle className="h-4 w-4" />
@@ -476,19 +482,22 @@ const SmartContractVerificationFlow: React.FC = () => {
           </Alert>
         )}
 
-
         {isOptedIn && (
           <>
             <div className="space-y-2">
               <Label htmlFor="link" className="text-white">Content Link</Label>
-              <Input
-                id="link"
-                type="url"
-                value={link}
+              <PlaceholdersAndVanishInput
+                placeholders={[
+                  "https://example.com/content-to-verify",
+                  "https://news.com/article-to-check",
+                  "https://social.com/post-to-verify"
+                ]}
                 onChange={(e) => setLink(e.target.value)}
-                placeholder="https://example.com/content-to-verify"
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/60"
-                disabled={status !== 'idle' && status !== 'error'}
+                onSubmit={() => {
+                  // Don't auto-submit on enter, let button handle it
+                }}
+                showArrow={false}
+                onVanishTrigger={(vanishFn: () => void) => setTriggerVanish(() => vanishFn)}
               />
             </div>
 
@@ -618,14 +627,14 @@ const SmartContractVerificationFlow: React.FC = () => {
               </Alert>
             )}
 
-            <div className="flex gap-2">
-              <Button
+            <div className="flex justify-center">
+              <InteractiveHoverButton
                 onClick={handleVerify}
                 disabled={status !== 'idle' || !link.trim()}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-40 bg-white text-black hover:bg-gray-100 font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
-                {status === 'idle' ? 'Start Verification' : getStatusText()}
-              </Button>
+                {status === 'idle' ? 'Start (1 ALGO)' : getStatusText()}
+              </InteractiveHoverButton>
               
               {(status === 'completed' || status === 'error') && (
                 <Button
@@ -639,12 +648,6 @@ const SmartContractVerificationFlow: React.FC = () => {
             </div>
           </>
         )}
-
-        <div className="flex items-center justify-center gap-2 text-sm text-white/60">
-          <Badge variant="secondary" className={getStatusColor()}>
-            Cost: 1 ALGO deposit → 2 ALGO reward (only if content is FAKE)
-          </Badge>
-        </div>
       </CardContent>
     </Card>
   );

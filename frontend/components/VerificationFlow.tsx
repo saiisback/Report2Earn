@@ -6,7 +6,7 @@ import { algodClient, algosToMicroAlgos, VERIFICATION_ESCROW_ADDRESS, ESCROW_MNE
 import algosdk from 'algosdk';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { PlaceholdersAndVanishInput } from '@/components/input-front';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -182,7 +182,7 @@ const VerificationFlow: React.FC = () => {
       <CardHeader>
         <CardTitle className="text-white flex items-center gap-2">
           {getStatusIcon()}
-          Verification Flow
+          AI Verification
         </CardTitle>
         <CardDescription className="text-white/80">
           {getStatusText()}
@@ -191,14 +191,18 @@ const VerificationFlow: React.FC = () => {
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="link" className="text-white">Content Link</Label>
-          <Input
-            id="link"
-            type="url"
-            value={link}
+          <PlaceholdersAndVanishInput
+            placeholders={[
+              "https://example.com/content-to-verify",
+              "https://news.com/article-to-check",
+              "https://social.com/post-to-verify"
+            ]}
             onChange={(e) => setLink(e.target.value)}
-            placeholder="https://example.com/content-to-verify"
-            className="bg-white/10 border-white/20 text-white placeholder:text-white/60"
-            disabled={status !== 'idle' && status !== 'error'}
+            onSubmit={() => {
+              if (status === 'idle' && link.trim()) {
+                handleVerify();
+              }
+            }}
           />
         </div>
 
@@ -253,7 +257,7 @@ const VerificationFlow: React.FC = () => {
           <Button
             onClick={handleVerify}
             disabled={status !== 'idle' || !link.trim()}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+            className="flex-1 bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-semibold rounded-lg"
           >
             {status === 'idle' ? 'Start Verification' : getStatusText()}
           </Button>
@@ -269,11 +273,12 @@ const VerificationFlow: React.FC = () => {
           )}
         </div>
 
-        <div className="flex items-center justify-center gap-2 text-sm text-white/60">
-          <Badge variant="secondary" className={getStatusColor()}>
-            Cost: 1 ALGO deposit + 1 ALGO reward
-          </Badge>
+        <div className="flex items-center justify-center">
+          <div className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            Cost: 1 ALGO deposit → 2 ALGO reward (only if content is FAKE)
+          </div>
         </div>
+
       </CardContent>
     </Card>
   );
