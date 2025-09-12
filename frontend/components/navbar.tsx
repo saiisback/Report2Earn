@@ -59,33 +59,35 @@ const FloatingNav = ({ navItems, className, instrumentSerif }: FloatingNavProps 
         duration: 0.2,
       }}
       className={cn(
-        "flex max-w-4xl fixed top-10 inset-x-0 mx-auto border border-white/20 rounded-full bg-white/10 backdrop-blur-md z-[5000] px-8 py-6 items-center justify-between space-x-8",
+        "grid grid-cols-3 max-w-4xl fixed top-10 inset-x-0 mx-auto border border-white/20 rounded-full bg-white/10 backdrop-blur-md z-[5000] px-8 py-6 items-center",
         className
       )}
     >
       {/* Logo */}
-      <div className={`${instrumentSerif.className} text-white text-2xl font-normal tracking-tight`}>
+      <div className={`${instrumentSerif.className} text-white text-2xl font-normal tracking-tight justify-self-start`}>
         R2E
       </div>
       
-      {/* Navigation Links */}
-      <div className="flex items-center space-x-6">
+      {/* Navigation Links - Centered */}
+      <div className="flex items-center space-x-8 justify-self-center">
         {navItems.map((navItem: any, idx: number) => (
           <Link
             key={`link-${idx}`}
             href={navItem.link}
             className={cn(
-              "relative text-white items-center flex space-x-1 hover:text-white/80"
+              "relative text-white items-center flex space-x-1 hover:text-white/80 transition-colors duration-200"
             )}
           >
             <span className="block sm:hidden">{navItem.icon}</span>
-            <span className="hidden sm:block text-sm">{navItem.name}</span>
+            <span className="hidden sm:block text-lg font-medium">{navItem.name}</span>
           </Link>
         ))}
       </div>
       
       {/* Wallet Button */}
-      <WalletConnection />
+      <div className="justify-self-end">
+        <WalletConnection />
+      </div>
     </motion.div>
   );
 };
