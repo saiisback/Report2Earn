@@ -22,11 +22,25 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual origins
+    allow_origins=[
+        "https://r2e-web3.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://*.vercel.app"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Health check endpoint
+@app.get("/")
+async def root():
+    return {"message": "AI Verification System is running", "status": "healthy"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "ai-verification"}
 
 # Initialize the verification system
 verifier = AgenticVerificationSystem()
