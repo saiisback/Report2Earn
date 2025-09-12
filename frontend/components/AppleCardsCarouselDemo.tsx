@@ -6,19 +6,25 @@ import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 
 export function BountyCardsCarousel() {
   const cards = bounties.map((bounty, index) => (
-    <Card
-      key={index}
-      className="border-white/10 backdrop-blur-md min-h-[400px] max-h-[400px] flex flex-col mx-2 min-w-[280px]"
-    >
-      <CardHeader>
-        <CardTitle className="text-sm md:text-base text-white font-semibold">
-          {bounty.title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col justify-between h-full">
-        {bounty.content}
-      </CardContent>
-    </Card>
+      <Card
+        key={index}
+        className="bg-white/5 border-white/10 backdrop-blur-xl min-h-[400px] max-h-[400px] flex flex-col mx-2 min-w-[300px] shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-[1.02]"
+      >
+        <CardHeader className="border-b border-white/10 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
+            <span className="text-xs text-white/70 font-medium uppercase tracking-wide">
+              {bounty.category}
+            </span>
+          </div>
+          <CardTitle className="text-lg font-bold text-white leading-tight">
+            {bounty.title}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col justify-between h-full p-4">
+          {bounty.content}
+        </CardContent>
+      </Card>
   ));
 
   return (
@@ -36,10 +42,24 @@ const BountyContent = ({
   reward: string;
 }) => {
   return (
-    <div className="flex flex-col justify-between h-full p-2 md:p-3">
-      <p className="text-xs md:text-sm text-neutral-200 line-clamp-3">{description}</p>
-      <div className="text-sm md:text-base font-semibold text-center text-white mt-2">
-        Reward: {reward}
+    <div className="flex flex-col justify-between h-full">
+      <div className="flex-1">
+        <p className="text-sm text-white leading-relaxed line-clamp-4 mb-4">
+          {description}
+        </p>
+      </div>
+      <div className="mt-auto">
+        <div className="bg-gradient-to-r from-yellow-400/10 to-yellow-500/5 border border-yellow-400/20 rounded-lg p-3 text-center backdrop-blur-sm">
+          <div className="text-xs text-white font-medium uppercase tracking-wide mb-1">
+            Reward
+          </div>
+          <div className="text-lg font-bold text-white">
+            {reward}
+          </div>
+        </div>
+        <button className="w-full mt-3 bg-gradient-to-r from-red-500/80 to-red-600/80 hover:from-red-600/90 hover:to-red-700/90 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:shadow-lg hover:scale-[1.02] backdrop-blur-sm border border-red-400/30">
+          Accept Bounty
+        </button>
       </div>
     </div>
   );
