@@ -180,13 +180,31 @@ class ContentScraper:
             except NoSuchElementException:
                 pass
             
-            # Extract images
+            # Extract images - improved selectors for better coverage
             try:
-                image_elements = self.driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweetPhoto"] img')
-                for img in image_elements:
-                    img_url = img.get_attribute('src')
-                    if img_url and 'media' in img_url:
-                        result['content_images'].append(img_url)
+                # Try multiple selectors for images
+                image_selectors = [
+                    '[data-testid="tweetPhoto"] img',
+                    '[data-testid="tweetPhoto"]',
+                    'img[src*="media"]',
+                    'img[src*="pbs.twimg.com"]',
+                    'img[alt*="Image"]'
+                ]
+                
+                for selector in image_selectors:
+                    image_elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for img in image_elements:
+                        img_url = img.get_attribute('src')
+                        if img_url and ('media' in img_url or 'pbs.twimg.com' in img_url):
+                            # Clean up the URL to get the full resolution image
+                            if '?format=' in img_url:
+                                img_url = img_url.split('?format=')[0] + '?format=jpg&name=orig'
+                            result['content_images'].append(img_url)
+                
+                # Remove duplicates
+                result['content_images'] = list(set(result['content_images']))
+                print(f"📸 Found {len(result['content_images'])} images in Twitter post")
+                
             except NoSuchElementException:
                 pass
             
@@ -233,20 +251,74 @@ class ContentScraper:
                 'timestamp': ''
             }
             
-            # Extract caption
+            # Extract author username
             try:
-                caption_element = self.driver.find_element(By.CSS_SELECTOR, 'h1')
-                result['content_text'] = caption_element.text
+                author_element = self.driver.find_element(By.CSS_SELECTOR, 'header a')
+                author_url = author_element.get_attribute('href')
+                if author_url:
+                    username_match = re.search(r'/([^/]+)/?$', author_url)
+                    if username_match:
+                        result['author']['username'] = username_match.group(1)
             except NoSuchElementException:
                 pass
             
-            # Extract images
+            # Extract caption - try multiple selectors
             try:
-                img_elements = self.driver.find_elements(By.CSS_SELECTOR, 'img')
-                for img in img_elements:
-                    src = img.get_attribute('src')
-                    if src and 'instagram' in src:
-                        result['content_images'].append(src)
+                caption_selectors = [
+                    'h1',
+                    '[data-testid="post-caption"]',
+                    'article div span',
+                    'div[data-testid="post-caption"]'
+                ]
+                
+                for selector in caption_selectors:
+                    try:
+                        caption_element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        if caption_element.text.strip():
+                            result['content_text'] = caption_element.text
+                            break
+                    except NoSuchElementException:
+                        continue
+                        
+            except NoSuchElementException:
+                pass
+            
+            # Extract images - improved selectors
+            try:
+                image_selectors = [
+                    'img[src*="instagram"]',
+                    'img[alt*="Photo by"]',
+                    'img[src*="cdninstagram"]',
+                    'article img'
+                ]
+                
+                for selector in image_selectors:
+                    img_elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for img in img_elements:
+                        src = img.get_attribute('src')
+                        if src and ('instagram' in src or 'cdninstagram' in src):
+                            # Clean up URL to get higher resolution
+                            if '?stp=' in src:
+                                src = src.split('?stp=')[0] + '?stp=dst-jpg_e35&_nc_ht=cdninstagram.com&_nc_cat=1&_nc_ohc='
+                            result['content_images'].append(src)
+                
+                # Remove duplicates
+                result['content_images'] = list(set(result['content_images']))
+                print(f"📸 Found {len(result['content_images'])} images in Instagram post")
+                
+            except NoSuchElementException:
+                pass
+            
+            # Extract engagement metrics
+            try:
+                # Likes
+                like_elements = self.driver.find_elements(By.CSS_SELECTOR, '[data-testid="like-button"]')
+                if like_elements:
+                    like_text = like_elements[0].get_attribute('aria-label')
+                    if like_text:
+                        like_count = re.search(r'(\d+)', like_text)
+                        if like_count:
+                            result['engagement']['likes'] = int(like_count.group(1))
             except NoSuchElementException:
                 pass
             
@@ -273,17 +345,113 @@ class ContentScraper:
                 'subreddit': ''
             }
             
-            # Extract title and text
+            # Extract subreddit
             try:
-                title_element = self.driver.find_element(By.CSS_SELECTOR, '[data-testid="post-content"] h1')
-                result['content_text'] = title_element.text
+                subreddit_selectors = [
+                    '[data-testid="subreddit-name"]',
+                    'a[href*="/r/"]',
+                    'span[data-testid="subreddit-name"]'
+                ]
+                
+                for selector in subreddit_selectors:
+                    try:
+                        subreddit_element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        if subreddit_element.text.strip():
+                            result['subreddit'] = subreddit_element.text
+                            break
+                    except NoSuchElementException:
+                        continue
             except NoSuchElementException:
                 pass
             
-            # Extract subreddit
+            # Extract author
             try:
-                subreddit_element = self.driver.find_element(By.CSS_SELECTOR, '[data-testid="subreddit-name"]')
-                result['subreddit'] = subreddit_element.text
+                author_selectors = [
+                    '[data-testid="post_author_link"]',
+                    'a[href*="/user/"]',
+                    'span[data-testid="post_author_link"]'
+                ]
+                
+                for selector in author_selectors:
+                    try:
+                        author_element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        author_text = author_element.text.strip()
+                        if author_text and not author_text.startswith('u/'):
+                            result['author']['username'] = author_text
+                            break
+                    except NoSuchElementException:
+                        continue
+            except NoSuchElementException:
+                pass
+            
+            # Extract title and text - try multiple selectors
+            try:
+                title_selectors = [
+                    '[data-testid="post-content"] h1',
+                    'h1[data-testid="post-title"]',
+                    'h1',
+                    '[data-testid="post-title"]'
+                ]
+                
+                for selector in title_selectors:
+                    try:
+                        title_element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        if title_element.text.strip():
+                            result['content_text'] = title_element.text
+                            break
+                    except NoSuchElementException:
+                        continue
+            except NoSuchElementException:
+                pass
+            
+            # Extract images - Reddit often has images in posts
+            try:
+                image_selectors = [
+                    'img[src*="i.redd.it"]',
+                    'img[src*="preview.redd.it"]',
+                    'img[src*="external-preview.redd.it"]',
+                    'img[alt*="image"]',
+                    'img[alt*="Image"]',
+                    '[data-testid="post-content"] img'
+                ]
+                
+                for selector in image_selectors:
+                    img_elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for img in img_elements:
+                        src = img.get_attribute('src')
+                        if src and ('redd.it' in src or 'preview' in src):
+                            # Clean up URL to get full resolution
+                            if '?width=' in src:
+                                src = src.split('?width=')[0]
+                            result['content_images'].append(src)
+                
+                # Remove duplicates
+                result['content_images'] = list(set(result['content_images']))
+                print(f"📸 Found {len(result['content_images'])} images in Reddit post")
+                
+            except NoSuchElementException:
+                pass
+            
+            # Extract engagement metrics
+            try:
+                # Upvotes
+                upvote_selectors = [
+                    '[data-testid="upvote-button"]',
+                    'button[aria-label*="upvote"]',
+                    '[data-testid="vote-arrows"] button'
+                ]
+                
+                for selector in upvote_selectors:
+                    try:
+                        upvote_element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        upvote_text = upvote_element.get_attribute('aria-label')
+                        if upvote_text:
+                            upvote_count = re.search(r'(\d+)', upvote_text)
+                            if upvote_count:
+                                result['engagement']['upvotes'] = int(upvote_count.group(1))
+                                break
+                    except NoSuchElementException:
+                        continue
             except NoSuchElementException:
                 pass
             

@@ -1,6 +1,28 @@
-# Agentic AI Verification System
+# Agentic AI Verification System with Dynamic Rewards & Image Processing
 
-A multi-agent AI system using LangGraph that simulates a group of AI agents working together to verify content authenticity. Each agent has a specific role and expertise, and they collaborate to make a final decision.
+A multi-agent AI system using LangGraph that simulates a group of AI agents working together to verify content authenticity. Each agent has a specific role and expertise, and they collaborate to make a final decision. The system now includes **dynamic reward calculation** based on content popularity and **advanced image processing** using Groq vision models.
+
+## 💰 Dynamic Reward System
+
+The system now features a sophisticated reward mechanism:
+
+- **Verification Fee**: Users pay 1 ALGO to verify content
+- **Base Reward**: 0.05 ALGO base fee for detecting fake content
+- **Popularity Multiplier**: 1.0x to 5.0x multiplier based on content popularity
+- **Dynamic Calculation**: Higher popularity content = higher rewards when detected as fake
+
+### Reward Formula
+```
+Dynamic Reward = Base Fee (0.05 ALGO) × Popularity Multiplier (1.0x - 5.0x)
+Maximum Reward: 1.0 ALGO (capped to prevent excessive rewards)
+```
+
+### Popularity Analysis
+The system analyzes content characteristics to determine popularity:
+- **Viral Keywords**: "breaking", "exclusive", "shocking", "amazing", etc.
+- **Emotional Content**: Emotional keywords that drive engagement
+- **Content Length**: Optimal length for shareability
+- **Engagement Patterns**: Simulated view counts and shares
 
 ## 🤖 Multi-Model AI Verification
 
@@ -38,15 +60,36 @@ All 5 models analyze the content independently, then the system:
 3. **Weights confidence scores** from aligned models
 4. **Generates comprehensive reasoning** from all perspectives
 
+## 🖼️ Image Processing with Groq Vision
+
+The system now includes advanced image processing capabilities using Groq's vision models:
+
+### **Vision Models Used**
+- **Llama 4 Scout** - `meta-llama/llama-4-scout-17b-16e-instruct`
+- **Llama 4 Maverick** - `meta-llama/llama-4-maverick-17b-128e-instruct`
+
+### **Image Analysis Features**
+- **Content Description** - Detailed analysis of objects, people, scenes
+- **Text Extraction (OCR)** - Extract text from images
+- **Manipulation Detection** - Identify signs of editing or AI generation
+- **Context Analysis** - Understand image context for verification
+- **Multi-image Support** - Process up to 5 images per request
+
+### **Supported Image Sources**
+- **Direct URLs** - Any publicly accessible image URL
+- **Social Media** - Images from Instagram, Twitter/X, Reddit
+- **Local Files** - Base64 encoded images
+- **Formats** - JPEG, PNG, WebP (auto-converted to JPEG)
+
 ## 🌐 Supported Platforms
 
-The scraper supports content from multiple platforms:
+The scraper supports content from multiple platforms with enhanced image extraction:
 
-- **Twitter/X** - Posts, images, engagement metrics
-- **Instagram** - Posts, reels, stories, captions
-- **Reddit** - Posts, comments, subreddit info
-- **YouTube** - Videos, titles, descriptions
-- **Generic Websites** - Any web page content
+- **Twitter/X** - Posts, images, engagement metrics, high-res image extraction
+- **Instagram** - Posts, reels, stories, captions, multiple image support
+- **Reddit** - Posts, comments, subreddit info, image posts
+- **YouTube** - Videos, titles, descriptions, thumbnails
+- **Generic Websites** - Any web page content with image analysis
 
 ## 🚀 Quick Start
 
@@ -63,11 +106,14 @@ Create a `.env` file:
 
 ```env
 OPENROUTER_API_KEY=your_openrouter_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
-Get your free API key from [OpenRouter](https://openrouter.ai/models?max_price=0&fmt=cards&input_modalities=text)
+Get your API keys:
+- **OpenRouter**: [OpenRouter](https://openrouter.ai/models?max_price=0&fmt=cards&input_modalities=text) (free)
+- **Groq**: [Groq Console](https://console.groq.com/) (free tier available)
 
-**Note**: This system uses OpenRouter exclusively - no OpenAI API key needed!
+**Note**: This system uses both OpenRouter (for text analysis) and Groq (for image processing)!
 
 ### 3. Run the API Server
 
@@ -79,7 +125,15 @@ The server will start on `http://localhost:8000`
 
 ### 4. Test the System
 
-See **Manual Testing** section below for testing instructions.
+```bash
+# Test image processing functionality
+python test_image_processing.py
+
+# Test the main verification system
+python ai_verification_system.py
+```
+
+See **Manual Testing** section below for more testing instructions.
 
 ## 📡 API Endpoints
 
@@ -110,6 +164,8 @@ Scrape content from any platform and verify using AI agents
         "final_decision": "authentic|fake|uncertain",
         "confidence": 0.85,
         "consensus_score": 0.75,
+        "popularity_score": 0.75,
+        "dynamic_reward": 0.1875,
         "individual_decisions": [...],
         "group_reasoning": "Detailed explanation..."
     }
@@ -136,6 +192,8 @@ Verify content using the multi-agent system (manual input)
         "final_decision": "authentic|fake|uncertain",
         "confidence": 0.85,
         "consensus_score": 0.75,
+        "popularity_score": 0.75,
+        "dynamic_reward": 0.1875,
         "individual_decisions": [...],
         "group_reasoning": "Detailed explanation..."
     }
@@ -162,6 +220,23 @@ The system uses a consensus-based approach:
 - **Authentic**: Majority of agents agree content is authentic
 - **Fake**: Majority of agents agree content is fake/manipulated
 - **Uncertain**: No clear consensus or mixed signals
+
+## 🧪 Testing Dynamic Rewards
+
+### Test Script
+Run the included test script to see dynamic rewards in action:
+
+```bash
+cd ai-verify
+python ../test_dynamic_rewards.py
+```
+
+This will test different content types and show how popularity affects rewards.
+
+### Expected Results
+- **Low Popularity**: ~0.05 ALGO reward (1.0x multiplier)
+- **Medium Popularity**: ~0.15 ALGO reward (3.0x multiplier)  
+- **High Popularity**: ~0.25 ALGO reward (5.0x multiplier)
 
 ## 🧪 Manual Testing
 

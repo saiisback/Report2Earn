@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { IconHome, IconShield, IconUsers } from "@tabler/icons-react"
+import { IconHome, IconShield, IconUsers, IconSettings } from "@tabler/icons-react"
 import { Instrument_Serif } from "next/font/google"
 import WalletConnection from "@/components/WalletConnection"
 import { motion, useScroll, useMotionValueEvent } from "motion/react"
@@ -108,6 +108,11 @@ export function NavbarComponent() {
       name: "Community",
       link: "/community",
       icon: <IconUsers className="h-4 w-4 text-white" />,
+    },
+    {
+      name: "Settings",
+      link: "/settings",
+      icon: <IconSettings className="h-4 w-4 text-white" />,
     },
   ];
 

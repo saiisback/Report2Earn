@@ -1,16 +1,20 @@
 import algosdk from 'algosdk';
+import { getNetworkConfig, getEscrowMnemonic } from '@/config/networks';
 
-// Algorand client configuration
+// Get current network configuration
+const networkConfig = getNetworkConfig();
+
+// Algorand client configuration based on current network
 export const algodClient = new algosdk.Algodv2(
-  process.env.NEXT_PUBLIC_ALGOD_TOKEN || '',
-  process.env.NEXT_PUBLIC_ALGOD_SERVER || 'https://testnet-api.algonode.cloud',
-  process.env.NEXT_PUBLIC_ALGOD_PORT || 443
+  networkConfig.algod.token,
+  networkConfig.algod.server,
+  networkConfig.algod.port
 );
 
 export const indexerClient = new algosdk.Indexer(
-  process.env.NEXT_PUBLIC_INDEXER_TOKEN || '',
-  process.env.NEXT_PUBLIC_INDEXER_SERVER || 'https://testnet-idx.algonode.cloud',
-  process.env.NEXT_PUBLIC_INDEXER_PORT || 443
+  networkConfig.indexer.token,
+  networkConfig.indexer.server,
+  networkConfig.indexer.port
 );
 
 // Utility functions
@@ -46,21 +50,17 @@ const generateTestEscrowAccount = () => {
 
 const testEscrowAccount = generateTestEscrowAccount();
 
-// Verification escrow address (using the smart contract creator's address)
-// In production, this should be a smart contract address
-export const VERIFICATION_ESCROW_ADDRESS = process.env.NEXT_PUBLIC_VERIFICATION_ESCROW || 'Q3Z2HNPQXU4WZYW3XXOEOSRBWUCURKBZTGYOEFVREWOX52QIHE7WELNECQ';
+// Network-specific configuration
+export const VERIFICATION_ESCROW_ADDRESS = networkConfig.contracts.verificationEscrow;
+export const REWARD_CONTRACT_APP_ID = networkConfig.contracts.rewardContractAppId;
+export const SMART_CONTRACT_APP_ID = networkConfig.contracts.smartContractAppId;
+export const SMART_CONTRACT_ADDRESS = networkConfig.contracts.smartContractAddress;
 
-// Escrow account mnemonic for signing transactions (for testing only)
-// Using the smart contract creator's mnemonic since it has ALGO
-export const ESCROW_MNEMONIC = process.env.ESCROW_MNEMONIC || 'guide once swamp raw view hospital unhappy timber trend people useful sausage venue harsh embody sponsor oyster come museum notice interest tribe beach abandon luggage';
+// Escrow account mnemonic for signing transactions (network-specific)
+export const ESCROW_MNEMONIC = getEscrowMnemonic();
 
-// Smart contract configuration
-export const REWARD_CONTRACT_APP_ID = process.env.NEXT_PUBLIC_REWARD_CONTRACT_APP_ID || 0;
-export const REWARD_AMOUNT = 2; // 2 ALGO
-
-// New smart contract for verification rewards
-export const SMART_CONTRACT_APP_ID = 745687090;
-export const SMART_CONTRACT_ADDRESS = 'Q3Z2HNPQXU4WZYW3XXOEOSRBWUCURKBZTGYOEFVREWOX52QIHE7WELNECQ';
+// Reward amount (2 ALGO)
+export const REWARD_AMOUNT = 2;
 
 // Smart contract interaction functions
 export const optInToRewardContract = async (userAddress: string) => {
