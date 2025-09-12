@@ -22,6 +22,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "components/AnimatedListDemo.tsx", "components/AppleCardsCarouselDemo.jsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "components/AnimatedListDemo.tsx", "components/AppleCardsCarouselDemo.tsx"],
   "exclude": ["node_modules"]
 }

@@ -1029,7 +1029,7 @@ const SmartContractVerificationFlow: React.FC = () => {
             <Button
               onClick={resetFlow}
               variant="outline"
-              className="border-white/20 text-black hover:bg-white/10 hover:text-white"
+              className="border-white/20 text-black hover:bg-white/10 hover:text-"
             >
               Verify Another Link
             </Button>
@@ -1174,7 +1174,7 @@ const SmartContractVerificationFlow: React.FC = () => {
                 <Button
                   onClick={resetFlow}
                   variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10"
+                  className="border-white/20 text-white  bg-transparent "
                 >
                   Reset
                 </Button>
