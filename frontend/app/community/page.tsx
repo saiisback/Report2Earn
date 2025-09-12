@@ -40,7 +40,7 @@ export default function CommunityPage() {
             <StatsMarquee />
           </div>
 
-          {/* Active Bounties + Live Feed */}
+          {/* Active Bounties + Live Feed test comment*/} 
           <section className="mb-12 w-full">
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
               {/* Bounties Carousel */}
