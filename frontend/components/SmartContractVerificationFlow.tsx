@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import WalletConnection from '@/components/WalletConnection';
 
 // Smart contract details are imported from lib/algorand.ts
 
@@ -437,7 +438,10 @@ const SmartContractVerificationFlow: React.FC = () => {
     return (
       <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
         <CardContent className="p-6 text-center">
-          <p className="text-white/80">Please connect your wallet to start verification</p>
+          <p className="text-white/80 mb-4">Please connect your wallet to start verification</p>
+          <div className="flex justify-center items-center">
+            <WalletConnection />
+          </div>
         </CardContent>
       </Card>
     );
