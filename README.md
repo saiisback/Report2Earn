@@ -24,22 +24,12 @@ R2E (Report to Earn) is a decentralized platform that combats misinformation by 
 
 ### Key Components
 
-- **AI Verification System**: Multi-agent AI system using 5 different models for content verification:
-     - *NVIDIA Nemotron Nano 9B v2*
-     - *DeepSeek R1*
-     - *Z-AI GLM 4.5 Air*
-     - *Mistral Small 3.2 24B Instruct*
-     - *DeepSeek R1 Qwen3 8B*
-
+- **AI Verification System**: Multi-agent AI system using 5 different models for content verification
 - **Multi-Model AI Verification**: Advanced ensemble of 5 specialized AI models working in parallel for comprehensive content analysis
-
 - **Blockchain Integration**: Algorand-based smart contracts for transparent reward distribution
 - **Web Frontend**: Modern Next.js interface for user interaction
 - **Content Scraping**: Automated content extraction from multiple social media platforms
 - **Dynamic Rewards**: Algorithm-based reward calculation based on content popularity and verification accuracy
-- **Community Governance**: Decentralized decision-making for platform rules and reward parameters
-- **Reputation System**: User reputation scoring based on verification accuracy and community contributions
-- **Automated Content Detection**: AI-powered identification of potentially misleading content
 - **Transparent Reporting**: Public verification reports with detailed reasoning and evidence
 - **Multi-language Support**: Global accessibility with support for multiple languages and regions
 
@@ -118,7 +108,12 @@ graph TB
 - **Wallet Integration**: Pera Wallet
 
 ### AI Models
-- **Text Analysis**: 5 Free OpenRouter Models 
+- **Text Analysis**: 5 Free OpenRouter Models (128K-164K context limits):
+    - *NVIDIA Nemotron Nano 9B v2* (128K context)
+    - *DeepSeek R1* (164K context - highest)
+    - *Z-AI GLM 4.5 Air* (131K context)
+    - *Mistral Small 3.2 24B Instruct* (131K context)
+    - *DeepSeek R1 Qwen3 8B* (131K context)
 - **Vision Processing**: Groq Vision Models (Llama 4)
 - **Consensus**: Custom multi-agent decision system
 
@@ -358,42 +353,53 @@ GET /agents
     {
       "name": "NVIDIA Nemotron Nano 9B v2",
       "model_id": "nvidia/nemotron-nano-9b-v2:free",
-      "context_limit": "4,096 tokens",
+      "context_limit": "128,000 tokens",
+      "created": "September 5, 2025",
+      "pricing": "$0/M input tokens, $0/M output tokens",
       "specialty": "Efficient reasoning and fact-checking",
       "strengths": "Fast processing, good at logical analysis"
     },
     {
+      "name": "DeepSeek R1",
+      "model_id": "deepseek/deepseek-r1:free",
+      "context_limit": "163,840 tokens",
+      "created": "January 20, 2025",
+      "pricing": "$0/M input tokens, $0/M output tokens",
+      "specialty": "Latest reasoning model",
+      "strengths": "State-of-the-art analysis, cutting-edge capabilities"
+    },
+    {
       "name": "Z-AI GLM 4.5 Air",
       "model_id": "z-ai/glm-4.5-air:free",
-      "context_limit": "8,192 tokens",
+      "context_limit": "131,072 tokens",
+      "created": "July 25, 2025",
+      "pricing": "$0/M input tokens, $0/M output tokens",
       "specialty": "Chinese-developed model with unique perspective",
       "strengths": "Different cultural context, alternative viewpoints"
     },
     {
       "name": "Mistral Small 3.2 24B Instruct",
       "model_id": "mistralai/mistral-small-3.2-24b-instruct:free",
-      "context_limit": "4,096 tokens",
+      "context_limit": "131,072 tokens",
+      "created": "June 20, 2025",
+      "pricing": "$0/M input tokens, $0/M output tokens",
       "specialty": "High-quality instruction following",
       "strengths": "Detailed analysis, comprehensive reasoning"
     },
     {
       "name": "DeepSeek R1 Qwen3 8B",
       "model_id": "deepseek/deepseek-r1-0528-qwen3-8b:free",
-      "context_limit": "4,096 tokens",
+      "context_limit": "131,072 tokens",
+      "created": "May 29, 2025",
+      "pricing": "$0/M input tokens, $0/M output tokens",
       "specialty": "Advanced reasoning capabilities",
       "strengths": "Complex logical analysis, pattern recognition"
-    },
-    {
-      "name": "DeepSeek R1",
-      "model_id": "deepseek/deepseek-r1:free",
-      "context_limit": "4,096 tokens",
-      "specialty": "Latest reasoning model",
-      "strengths": "State-of-the-art analysis, cutting-edge capabilities"
     }
   ],
   "workflow": "Parallel analysis with consensus-based decision-making",
   "total_models": 5,
-  "consensus_method": "Majority voting with confidence weighting"
+  "consensus_method": "Majority voting with confidence weighting",
+  "total_context_range": "128K-164K tokens"
 }
 ```
 
@@ -476,34 +482,39 @@ Real-time feed of verification activities and community updates.
 The system uses 5 different AI models working in parallel:
 
 1. **NVIDIA Nemotron Nano 9B v2** (`nvidia/nemotron-nano-9b-v2:free`)
-   - **Context Limit**: 4,096 tokens
+   - **Context Limit**: 128,000 tokens
+   - **Created**: September 5, 2025
+   - **Pricing**: $0/M input tokens, $0/M output tokens
    - **Specialty**: Efficient reasoning and fact-checking
    - **Strengths**: Fast processing, good at logical analysis
-   - **Pricing**: Free tier available
 
-2. **Z-AI GLM 4.5 Air** (`z-ai/glm-4.5-air:free`)
-   - **Context Limit**: 8,192 tokens
-   - **Specialty**: Chinese-developed model with unique perspective
-   - **Strengths**: Different cultural context, alternative viewpoints
-   - **Pricing**: Free tier available
-
-3. **Mistral Small 3.2 24B Instruct** (`mistralai/mistral-small-3.2-24b-instruct:free`)
-   - **Context Limit**: 4,096 tokens
-   - **Specialty**: High-quality instruction following
-   - **Strengths**: Detailed analysis, comprehensive reasoning
-   - **Pricing**: Free tier available
-
-4. **DeepSeek R1 Qwen3 8B** (`deepseek/deepseek-r1-0528-qwen3-8b:free`)
-   - **Context Limit**: 4,096 tokens
-   - **Specialty**: Advanced reasoning capabilities
-   - **Strengths**: Complex logical analysis, pattern recognition
-   - **Pricing**: Free tier available
-
-5. **DeepSeek R1** (`deepseek/deepseek-r1:free`)
-   - **Context Limit**: 4,096 tokens
+2. **DeepSeek R1** (`deepseek/deepseek-r1:free`)
+   - **Context Limit**: 163,840 tokens (highest context)
+   - **Created**: January 20, 2025
+   - **Pricing**: $0/M input tokens, $0/M output tokens
    - **Specialty**: Latest reasoning model
    - **Strengths**: State-of-the-art analysis, cutting-edge capabilities
-   - **Pricing**: Free tier available
+
+3. **Z-AI GLM 4.5 Air** (`z-ai/glm-4.5-air:free`)
+   - **Context Limit**: 131,072 tokens
+   - **Created**: July 25, 2025
+   - **Pricing**: $0/M input tokens, $0/M output tokens
+   - **Specialty**: Chinese-developed model with unique perspective
+   - **Strengths**: Different cultural context, alternative viewpoints
+
+4. **Mistral Small 3.2 24B Instruct** (`mistralai/mistral-small-3.2-24b-instruct:free`)
+   - **Context Limit**: 131,072 tokens
+   - **Created**: June 20, 2025
+   - **Pricing**: $0/M input tokens, $0/M output tokens
+   - **Specialty**: High-quality instruction following
+   - **Strengths**: Detailed analysis, comprehensive reasoning
+
+5. **DeepSeek R1 Qwen3 8B** (`deepseek/deepseek-r1-0528-qwen3-8b:free`)
+   - **Context Limit**: 131,072 tokens
+   - **Created**: May 29, 2025
+   - **Pricing**: $0/M input tokens, $0/M output tokens
+   - **Specialty**: Advanced reasoning capabilities
+   - **Strengths**: Complex logical analysis, pattern recognition
 
 ### Consensus Mechanism
 - **Individual Analysis**: Each model analyzes content independently
