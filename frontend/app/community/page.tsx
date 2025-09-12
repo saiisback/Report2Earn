@@ -3,10 +3,11 @@
 import { GradientBackground } from "@/components/gradient-background"
 import { Instrument_Serif } from "next/font/google"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Target, Coins } from "lucide-react"
+import { Target, Coins, Trophy } from "lucide-react"
 import { StatsMarquee } from "@/components/stats-marquee"
 import { BountyCardsCarousel } from "@/components/AppleCardsCarouselDemo"
-import { AnimatedListDemo } from "@/components/AnimatedListDemo"
+import { RandomLiveFeed } from "@/components/RandomLiveFeed"
+import { Leaderboard } from "@/components/Leaderboard"
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -66,23 +67,67 @@ export default function CommunityPage() {
               </Card>
 
               {/* Live Feed */}
-              <Card className="bg-white/5 border-white/10 backdrop-blur-md h-[800px] overflow-hidden ">
-                <CardHeader>
-                  <CardTitle className="text-white text-lg flex items-center gap-2">
-                    <Coins className="h-5 w-5 text-yellow-400" />
-                    Live Feed
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="h-full">
-                  <AnimatedListDemo className="h-full" />
-                </CardContent>
-              </Card>
+              <RandomLiveFeed />
             </div>
           </section>
 
-          {/* Future Sections: Quests, Guilds, Leaderboard */}
+          {/* Leaderboard Section */}
           <section className="mb-12">
-            {/* You can add quest cards, guild leaderboard here later */}
+            <div className="text-center mb-8">
+              <h2 className={`${instrumentSerif.className} text-white text-4xl md:text-5xl mb-4`}>
+                Top Hunters
+              </h2>
+              <p className="text-white/80 text-lg max-w-2xl mx-auto">
+                See who's leading the pack in the battle against misinformation
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Top 5 Leaderboard */}
+              <div className="space-y-4">
+                <h3 className="text-white text-xl font-semibold flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-yellow-400" />
+                  Top 5 Hunters
+                </h3>
+                <Leaderboard />
+              </div>
+              
+              {/* Community Stats */}
+              <Card className="bg-white/5 border-white/10 backdrop-blur-md">
+                <CardHeader>
+                  <CardTitle className="text-white text-lg flex items-center gap-2">
+                    <Target className="h-5 w-5 text-red-300" />
+                    Community Stats
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-4 bg-white/5 rounded-lg">
+                      <div className="text-2xl font-bold text-white">2,847</div>
+                      <div className="text-sm text-white/70">Active Hunters</div>
+                    </div>
+                    <div className="text-center p-4 bg-white/5 rounded-lg">
+                      <div className="text-2xl font-bold text-white">15,420</div>
+                      <div className="text-sm text-white/70">Bounties Completed</div>
+                    </div>
+                    <div className="text-center p-4 bg-white/5 rounded-lg">
+                      <div className="text-2xl font-bold text-white">₳89,230</div>
+                      <div className="text-sm text-white/70">Rewards Distributed</div>
+                    </div>
+                    <div className="text-center p-4 bg-white/5 rounded-lg">
+                      <div className="text-2xl font-bold text-white">98.7%</div>
+                      <div className="text-sm text-white/70">Accuracy Rate</div>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-white/10">
+                    <div className="text-center text-white/70 text-sm">
+                      Last updated: {new Date().toLocaleTimeString()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </section>
         </div>
       </main>

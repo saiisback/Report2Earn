@@ -8,7 +8,7 @@ export function BountyCardsCarousel() {
   const cards = bounties.map((bounty, index) => (
     <Card
       key={index}
-      className="bg-white/5 border-white/10 backdrop-blur-md min-h-[400px] max-h-[400px] flex flex-col mx-2 min-w-[280px]"
+      className="border-white/10 backdrop-blur-md min-h-[400px] max-h-[400px] flex flex-col mx-2 min-w-[280px]"
     >
       <CardHeader>
         <CardTitle className="text-sm md:text-base text-white font-semibold">
@@ -47,62 +47,82 @@ const BountyContent = ({
 
 const bounties = [
   {
-    category: "Smart Contracts",
-    title: "Build a secure Algorand Escrow Contract",
+    category: "Misinformation",
+    title: "Verify Viral Twitter Post",
     content: (
       <BountyContent
-        description="Design and deploy a trustless escrow contract on Algorand that releases funds only when conditions are met."
-        reward="250 ALGO"
+        description="Fact-check a viral tweet claiming celebrity death. Verify authenticity and trace original source."
+        reward="50 ALGO"
       />
     ),
   },
   {
-    category: "Developer Tools",
-    title: "Algorand Wallet Integration SDK",
+    category: "Deepfake",
+    title: "Detect AI-Generated Video",
     content: (
       <BountyContent
-        description="Create an easy-to-use SDK for integrating Algorand wallet authentication into dApps."
-        reward="500 ALGO"
+        description="Analyze suspicious video content on TikTok. Determine if it's AI-generated and identify manipulation techniques."
+        reward="75 ALGO"
       />
     ),
   },
   {
-    category: "DeFi",
-    title: "Build a Lending Protocol Prototype",
+    category: "News Verification",
+    title: "Verify Breaking News Story",
     content: (
       <BountyContent
-        description="Prototype a decentralized lending platform on Algorand with collateralized loans."
-        reward="750 ALGO"
+        description="Cross-reference breaking news claims with multiple sources. Verify timeline and authenticity of events."
+        reward="100 ALGO"
       />
     ),
   },
   {
-    category: "Mobile Apps",
-    title: "iOS App for Algorand Transactions",
+    category: "Social Media",
+    title: "Instagram Post Verification",
     content: (
       <BountyContent
-        description="Build a mobile-first wallet app for iOS with Algorand payments and NFT support."
-        reward="600 ALGO"
+        description="Verify authenticity of viral Instagram post. Check for image manipulation and source credibility."
+        reward="40 ALGO"
       />
     ),
   },
   {
-    category: "Community",
-    title: "Algorand Educational Content",
+    category: "Reddit",
+    title: "Debunk Conspiracy Theory",
     content: (
       <BountyContent
-        description="Produce high-quality tutorials and guides to help onboard new developers into the Algorand ecosystem."
-        reward="300 ALGO"
+        description="Investigate and debunk conspiracy theory post on Reddit. Provide evidence-based counterarguments."
+        reward="60 ALGO"
       />
     ),
   },
   {
-    category: "Security",
-    title: "Audit an Algorand Smart Contract",
+    category: "YouTube",
+    title: "Verify Educational Content",
     content: (
       <BountyContent
-        description="Perform a full audit on an existing Algorand contract and provide detailed vulnerability reports."
-        reward="1000 ALGO"
+        description="Fact-check educational YouTube video. Verify claims, check sources, and assess accuracy of information."
+        reward="80 ALGO"
+      />
+    ),
+  },
+  {
+    category: "Political",
+    title: "Verify Political Statement",
+    content: (
+      <BountyContent
+        description="Fact-check political claim from public figure. Verify statistics, quotes, and historical accuracy."
+        reward="120 ALGO"
+      />
+    ),
+  },
+  {
+    category: "Health",
+    title: "Medical Misinformation",
+    content: (
+      <BountyContent
+        description="Verify health claims and medical advice. Check against peer-reviewed sources and medical consensus."
+        reward="90 ALGO"
       />
     ),
   },
