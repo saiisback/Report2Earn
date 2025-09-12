@@ -36,52 +36,8 @@ R2E (Report to Earn) is a decentralized platform that combats misinformation by 
 
 ## Architecture
 
-```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        A[Next.js Frontend] --> B[Wallet Connection]
-        A --> C[Verification Interface]
-        A --> D[Community Dashboard]
-    end
-    
-    subgraph "API Layer"
-        E[FastAPI Server] --> F[Content Scraper]
-        E --> G[AI Verification System]
-        E --> H[Image Processor]
-    end
-    
-    subgraph "AI Models"
-        I[NVIDIA Nemotron] --> J[Consensus Engine]
-        K[Z-AI GLM 4.5] --> J
-        L[Mistral Small] --> J
-        M[Kimi Dev 72B] --> J
-        N[DeepSeek R1 Qwen3] --> J
-    end
-    
-    subgraph "Blockchain Layer"
-        O[Algorand Network] --> P[Smart Contract]
-        P --> Q[Reward Distribution]
-        P --> R[Opt-in Management]
-    end
-    
-    subgraph "External Services"
-        S[OpenRouter API] --> G
-        T[Groq Vision API] --> H
-        U[Social Media APIs] --> F
-    end
-    
-    A --> E
-    E --> I
-    E --> K
-    E --> L
-    E --> M
-    E --> N
-    A --> O
-    J --> E
-    G --> E
-    H --> E
-    F --> E
-```
+<img width="3840" height="2903" alt="Untitled diagram _ Mermaid Chart-2025-09-12-100326" src="https://github.com/user-attachments/assets/1de61087-d5a0-4c20-b213-ad4f52e3137b" />
+
 
 ## Tech Stack
 
