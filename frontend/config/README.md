@@ -6,6 +6,8 @@ This guide explains how to configure your frontend application for different Alg
 
 Create a `.env.local` file in the frontend root directory with the following variables:
 
+**Note:** Copy the example below and create your `.env.local` file manually.
+
 ### Basic Configuration
 
 ```env
