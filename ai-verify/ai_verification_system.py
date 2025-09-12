@@ -107,16 +107,16 @@ class AgenticVerificationSystem:
                 timeout=30,
                 max_retries=2
             ),
-            "deepseek_r1_qwen": ChatOpenAI(
-                model="deepseek/deepseek-r1-0528-qwen3-8b:free",
+            "dolphin_mistral_24b": ChatOpenAI(
+                model="cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
                 openai_api_base="https://openrouter.ai/api/v1",
                 openai_api_key=os.getenv("OPENROUTER_API_KEY"),
                 temperature=0.7,
                 timeout=30,
                 max_retries=2
             ),
-            "deepseek_r1": ChatOpenAI(
-                model="deepseek/deepseek-r1:free",
+            "kimi_dev_72b": ChatOpenAI(
+                model="moonshotai/kimi-dev-72b:free",
                 openai_api_base="https://openrouter.ai/api/v1",
                 openai_api_key=os.getenv("OPENROUTER_API_KEY"),
                 temperature=0.7,

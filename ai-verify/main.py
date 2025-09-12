@@ -210,14 +210,14 @@ async def get_agents():
                 "strengths": "Detailed analysis, comprehensive reasoning"
             },
             {
-                "name": "DeepSeek R1 Qwen3 8B",
-                "model_id": "deepseek/deepseek-r1-0528-qwen3-8b:free",
+                "name": "Dolphin Mistral 24B Venice Edition",
+                "model_id": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
                 "specialty": "Advanced reasoning capabilities",
                 "strengths": "Complex logical analysis, pattern recognition"
             },
             {
-                "name": "DeepSeek R1",
-                "model_id": "deepseek/deepseek-r1:free",
+                "name": "Kimi Dev 72B",
+                "model_id": "moonshotai/kimi-dev-72b:free",
                 "specialty": "Latest reasoning model",
                 "strengths": "State-of-the-art analysis, cutting-edge capabilities"
             }

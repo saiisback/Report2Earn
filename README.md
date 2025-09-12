@@ -54,7 +54,7 @@ graph TB
         I[NVIDIA Nemotron] --> J[Consensus Engine]
         K[Z-AI GLM 4.5] --> J
         L[Mistral Small] --> J
-        M[DeepSeek R1] --> J
+        M[Kimi Dev 72B] --> J
         N[DeepSeek R1 Qwen3] --> J
     end
     
@@ -110,7 +110,7 @@ graph TB
 ### AI Models
 - **Text Analysis**: 5 Free OpenRouter Models (128K-164K context limits):
     - *NVIDIA Nemotron Nano 9B v2* (128K context)
-    - *DeepSeek R1* (164K context - highest)
+    - *Kimi Dev 72B* (164K context - highest)
     - *Z-AI GLM 4.5 Air* (131K context)
     - *Mistral Small 3.2 24B Instruct* (131K context)
     - *DeepSeek R1 Qwen3 8B* (131K context)
@@ -360,8 +360,8 @@ GET /agents
       "strengths": "Fast processing, good at logical analysis"
     },
     {
-      "name": "DeepSeek R1",
-      "model_id": "deepseek/deepseek-r1:free",
+      "name": "Kimi Dev 72B",
+      "model_id": "moonshotai/kimi-dev-72b:free",
       "context_limit": "163,840 tokens",
       "created": "January 20, 2025",
       "pricing": "$0/M input tokens, $0/M output tokens",
@@ -387,8 +387,8 @@ GET /agents
       "strengths": "Detailed analysis, comprehensive reasoning"
     },
     {
-      "name": "DeepSeek R1 Qwen3 8B",
-      "model_id": "deepseek/deepseek-r1-0528-qwen3-8b:free",
+      "name": "Dolphin Mistral 24B Venice Edition",
+      "model_id": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
       "context_limit": "131,072 tokens",
       "created": "May 29, 2025",
       "pricing": "$0/M input tokens, $0/M output tokens",
@@ -488,7 +488,7 @@ The system uses 5 different AI models working in parallel:
    - **Specialty**: Efficient reasoning and fact-checking
    - **Strengths**: Fast processing, good at logical analysis
 
-2. **DeepSeek R1** (`deepseek/deepseek-r1:free`)
+2. **Kimi Dev 72B** (`moonshotai/kimi-dev-72b:free`)
    - **Context Limit**: 163,840 tokens (highest context)
    - **Created**: January 20, 2025
    - **Pricing**: $0/M input tokens, $0/M output tokens
@@ -509,7 +509,7 @@ The system uses 5 different AI models working in parallel:
    - **Specialty**: High-quality instruction following
    - **Strengths**: Detailed analysis, comprehensive reasoning
 
-5. **DeepSeek R1 Qwen3 8B** (`deepseek/deepseek-r1-0528-qwen3-8b:free`)
+5. **Dolphin Mistral 24B Venice Edition** (`cognitivecomputations/dolphin-mistral-24b-venice-edition:free`)
    - **Context Limit**: 131,072 tokens
    - **Created**: May 29, 2025
    - **Pricing**: $0/M input tokens, $0/M output tokens
