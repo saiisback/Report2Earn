@@ -8,6 +8,7 @@ export function GradientBackground() {
         loop
         muted
         playsInline
+        preload="auto"
       />
     </div>
   );
