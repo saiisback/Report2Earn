@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "@radix-ui/react-tooltip": "^1.2.8",
-    "framer-motion": "^12.23.12"
-  }
-}

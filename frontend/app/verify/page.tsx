@@ -19,9 +19,6 @@ import {
 import algosdk from "algosdk"
 import { useState } from "react"
 import { CheckCircle, AlertTriangle, XCircle, Loader2, ExternalLink, Shield } from "lucide-react"
-import { motion } from "framer-motion"
-import { Search, ArrowRight, Info } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Type definitions
 interface AgentDecision {
@@ -239,107 +236,24 @@ export default function VerifyPage() {
         <div className="absolute inset-0 -z-10 bg-black/20" />
 
         <div className="container mx-auto px-4 py-12">
-          {/* Refined Header Section */}
+          {/* Header Section */}
           <section className="text-center mb-20">
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+            <h1
               className={`${instrumentSerif.className} text-white text-center text-balance font-normal tracking-tight text-6xl md:text-7xl mb-8`}
             >
               Verify Before You Share
-            </motion.h1>
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="text-white/90 text-xl mb-12 text-balance max-w-3xl mx-auto leading-relaxed"
-            >
+            </h1>
+            <p className="text-white/90 text-xl mb-12 text-balance max-w-3xl mx-auto leading-relaxed">
               Stop the spread of misinformation. Our AI-powered verification system analyzes content across multiple platforms and provides instant, trustworthy results.
-            </motion.p>
+            </p>
           </section>
 
-          {/* Enhanced Verification Interface */}
-          <section className="max-w-3xl mx-auto mb-20">
-            <Card className="bg-white/5 border-white/10 backdrop-blur-md shadow-2xl">
-              <CardContent className="p-8">
-                {/* Input Section */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <Shield className="h-6 w-6 text-blue-400" />
-                    <h2 className="text-xl text-white font-medium">Content Verification</h2>
-                  </div>
-
-                  {/* Sophisticated Input Field */}
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Search className="h-5 w-5 text-white/40" />
-                    </div>
-                    <input
-                      type="text"
-                      value={verificationUrl}
-                      onChange={(e) => setVerificationUrl(e.target.value)}
-                      placeholder="Paste content URL here..."
-                      className="w-full bg-white/5 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                    />
-                  </div>
-
-                  {/* Verification Info */}
-                  <div className="flex items-center justify-between text-sm text-white/60">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger className="flex items-center gap-2">
-                          <Info className="h-4 w-4" />
-                          <span>Verification Process</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Deposit 1 ALGO, earn 2 ALGO for verified safe content</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <span>Typical verification time: ~30 seconds</span>
-                  </div>
-
-                  {/* Action Button */}
-                  <Button
-                    onClick={handleVerify}
-                    disabled={isProcessing || !verificationUrl}
-                    className="w-full bg-gradient-to-r from-blue-500/80 to-purple-500/80 hover:from-blue-500/90 hover:to-purple-500/90 text-white border-none shadow-lg"
-                  >
-                    {isProcessing ? (
-                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    ) : (
-                      <>
-                        Start Verification
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {/* Results Section */}
-                {verificationResult && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-8 p-6 bg-white/5 rounded-lg border border-white/10"
-                  >
-                    {/* ... existing results display logic with refined styling ... */}
-                  </motion.div>
-                )}
-
-                {/* Error Display */}
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mt-4 p-4 bg-red-500/20 border border-red-500/40 rounded-lg text-white"
-                  >
-                    {error}
-                  </motion.div>
-                )}
-              </CardContent>
-            </Card>
+          {/* Smart Contract Verification Section */}
+          <section className="max-w-5xl mx-auto mb-20">
+            <SmartContractVerificationFlow />
           </section>
+
+
         </div>
       </main>
     </div>
