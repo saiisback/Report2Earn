@@ -155,7 +155,7 @@ export default function CommunityPage() {
         <div className="p-2 bg-red-500/20 rounded-lg">
           <Target className="h-5 w-5 text-red-300" />
         </div>
-        <CardTitle className="text-white">Active Bounties</CardTitle>
+        <CardTitle className="text-white">Active Bounty</CardTitle>
       </div>
     </CardHeader>
     <CardContent>

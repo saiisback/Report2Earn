@@ -64,8 +64,8 @@ MAINNET_ESCROW_MNEMONIC=your_mainnet_escrow_mnemonic_here
 ### AI Verification API
 
 ```env
-# AI Verification API URL
-NEXT_PUBLIC_AI_VERIFICATION_API_URL=http://localhost:8000
+# AI Verification API URL (replace with your Railway URL)
+NEXT_PUBLIC_AI_VERIFY_API_URL=https://your-railway-app.railway.app
 ```
 
 ## Usage

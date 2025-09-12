@@ -134,7 +134,7 @@ export default function VerifyPage() {
       setDepositTxId(depositTxId);
 
       // Step 2: AI Verification
-      const apiResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/scrape-and-verify`, {
+      const apiResponse = await fetch(`${process.env.NEXT_PUBLIC_AI_VERIFY_API_URL || 'http://localhost:8000'}/scrape-and-verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: verificationUrl }),
