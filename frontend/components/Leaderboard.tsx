@@ -16,6 +16,19 @@ interface LeaderboardEntry {
   streak: number;
 }
 
+const geometricAvatars = [
+  { shape: 'circle', color: 'bg-blue-500', pattern: 'bg-gradient-to-br from-blue-400 to-blue-600' },
+  { shape: 'square', color: 'bg-purple-500', pattern: 'bg-gradient-to-br from-purple-400 to-purple-600' },
+  { shape: 'triangle', color: 'bg-green-500', pattern: 'bg-gradient-to-br from-green-400 to-green-600' },
+  { shape: 'hexagon', color: 'bg-orange-500', pattern: 'bg-gradient-to-br from-orange-400 to-orange-600' },
+  { shape: 'diamond', color: 'bg-pink-500', pattern: 'bg-gradient-to-br from-pink-400 to-pink-600' },
+  { shape: 'circle', color: 'bg-cyan-500', pattern: 'bg-gradient-to-br from-cyan-400 to-cyan-600' },
+  { shape: 'square', color: 'bg-red-500', pattern: 'bg-gradient-to-br from-red-400 to-red-600' },
+  { shape: 'triangle', color: 'bg-yellow-500', pattern: 'bg-gradient-to-br from-yellow-400 to-yellow-600' },
+  { shape: 'hexagon', color: 'bg-indigo-500', pattern: 'bg-gradient-to-br from-indigo-400 to-indigo-600' },
+  { shape: 'diamond', color: 'bg-teal-500', pattern: 'bg-gradient-to-br from-teal-400 to-teal-600' }
+];
+
 const mockLeaderboardData: LeaderboardEntry[] = [
   {
     id: 1,
@@ -23,7 +36,7 @@ const mockLeaderboardData: LeaderboardEntry[] = [
     score: 15420,
     bountiesCompleted: 127,
     rank: 1,
-    avatar: "👑",
+    avatar: "crown",
     isOnline: true,
     streak: 15
   },
@@ -33,7 +46,7 @@ const mockLeaderboardData: LeaderboardEntry[] = [
     score: 14230,
     bountiesCompleted: 118,
     rank: 2,
-    avatar: "🥇",
+    avatar: "trophy",
     isOnline: true,
     streak: 12
   },
@@ -43,7 +56,7 @@ const mockLeaderboardData: LeaderboardEntry[] = [
     score: 13890,
     bountiesCompleted: 115,
     rank: 3,
-    avatar: "🥈",
+    avatar: "medal",
     isOnline: false,
     streak: 8
   },
@@ -53,7 +66,7 @@ const mockLeaderboardData: LeaderboardEntry[] = [
     score: 12560,
     bountiesCompleted: 98,
     rank: 4,
-    avatar: "🥉",
+    avatar: "award",
     isOnline: true,
     streak: 6
   },
@@ -63,7 +76,7 @@ const mockLeaderboardData: LeaderboardEntry[] = [
     score: 11200,
     bountiesCompleted: 89,
     rank: 5,
-    avatar: "⭐",
+    avatar: "star",
     isOnline: false,
     streak: 3
   },
@@ -73,7 +86,7 @@ const mockLeaderboardData: LeaderboardEntry[] = [
     score: 10850,
     bountiesCompleted: 85,
     rank: 6,
-    avatar: "🛡️",
+    avatar: "shield",
     isOnline: true,
     streak: 7
   },
@@ -83,7 +96,7 @@ const mockLeaderboardData: LeaderboardEntry[] = [
     score: 9950,
     bountiesCompleted: 78,
     rank: 7,
-    avatar: "🤖",
+    avatar: "robot",
     isOnline: true,
     streak: 4
   },
@@ -93,7 +106,7 @@ const mockLeaderboardData: LeaderboardEntry[] = [
     score: 9200,
     bountiesCompleted: 72,
     rank: 8,
-    avatar: "🔒",
+    avatar: "lock",
     isOnline: false,
     streak: 2
   },
@@ -103,7 +116,7 @@ const mockLeaderboardData: LeaderboardEntry[] = [
     score: 8750,
     bountiesCompleted: 68,
     rank: 9,
-    avatar: "💥",
+    avatar: "explosion",
     isOnline: true,
     streak: 5
   },
@@ -113,7 +126,7 @@ const mockLeaderboardData: LeaderboardEntry[] = [
     score: 8200,
     bountiesCompleted: 64,
     rank: 10,
-    avatar: "🎯",
+    avatar: "target",
     isOnline: false,
     streak: 1
   }
@@ -143,6 +156,33 @@ const getRankBadgeColor = (rank: number) => {
     default:
       return "bg-white/10 text-white";
   }
+};
+
+const getGeometricAvatar = (username: string, index: number) => {
+  const avatar = geometricAvatars[index % geometricAvatars.length];
+  
+  const getShapeClass = (shape: string) => {
+    switch (shape) {
+      case 'circle':
+        return 'rounded-full';
+      case 'square':
+        return 'rounded-lg';
+      case 'triangle':
+        return 'transform rotate-45 rounded-sm';
+      case 'hexagon':
+        return 'rounded-lg transform rotate-12';
+      case 'diamond':
+        return 'transform rotate-45 rounded-sm';
+      default:
+        return 'rounded-full';
+    }
+  };
+
+  return (
+    <div className={`w-10 h-10 ${avatar.pattern} ${getShapeClass(avatar.shape)} flex items-center justify-center`}>
+      <div className="w-5 h-5 bg-white/20 rounded-full"></div>
+    </div>
+  );
 };
 
 export function Leaderboard() {
@@ -196,7 +236,7 @@ export function Leaderboard() {
                 </span>
               </div>
               
-              <div className="text-2xl">{entry.avatar}</div>
+              {getGeometricAvatar(entry.username, entry.id - 1)}
               
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">

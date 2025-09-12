@@ -60,6 +60,25 @@ const usernames = [
   'FakeNewsFighter', 'TruthSeeker_42', 'VerificationViking', 'BountyBandit'
 ];
 
+const geometricAvatars = [
+  { shape: 'circle', color: 'bg-blue-500', pattern: 'bg-gradient-to-br from-blue-400 to-blue-600' },
+  { shape: 'square', color: 'bg-purple-500', pattern: 'bg-gradient-to-br from-purple-400 to-purple-600' },
+  { shape: 'triangle', color: 'bg-green-500', pattern: 'bg-gradient-to-br from-green-400 to-green-600' },
+  { shape: 'hexagon', color: 'bg-orange-500', pattern: 'bg-gradient-to-br from-orange-400 to-orange-600' },
+  { shape: 'diamond', color: 'bg-pink-500', pattern: 'bg-gradient-to-br from-pink-400 to-pink-600' },
+  { shape: 'circle', color: 'bg-cyan-500', pattern: 'bg-gradient-to-br from-cyan-400 to-cyan-600' },
+  { shape: 'square', color: 'bg-red-500', pattern: 'bg-gradient-to-br from-red-400 to-red-600' },
+  { shape: 'triangle', color: 'bg-yellow-500', pattern: 'bg-gradient-to-br from-yellow-400 to-yellow-600' },
+  { shape: 'hexagon', color: 'bg-indigo-500', pattern: 'bg-gradient-to-br from-indigo-400 to-indigo-600' },
+  { shape: 'diamond', color: 'bg-teal-500', pattern: 'bg-gradient-to-br from-teal-400 to-teal-600' },
+  { shape: 'circle', color: 'bg-rose-500', pattern: 'bg-gradient-to-br from-rose-400 to-rose-600' },
+  { shape: 'square', color: 'bg-emerald-500', pattern: 'bg-gradient-to-br from-emerald-400 to-emerald-600' },
+  { shape: 'triangle', color: 'bg-violet-500', pattern: 'bg-gradient-to-br from-violet-400 to-violet-600' },
+  { shape: 'hexagon', color: 'bg-amber-500', pattern: 'bg-gradient-to-br from-amber-400 to-amber-600' },
+  { shape: 'diamond', color: 'bg-sky-500', pattern: 'bg-gradient-to-br from-sky-400 to-sky-600' },
+  { shape: 'circle', color: 'bg-lime-500', pattern: 'bg-gradient-to-br from-lime-400 to-lime-600' }
+];
+
 const getEventIcon = (type: string) => {
   switch (type) {
     case 'bounty_completed':
@@ -92,6 +111,34 @@ const getEventColor = (type: string) => {
     default:
       return 'border-white/20 bg-white/5';
   }
+};
+
+const getGeometricAvatar = (username: string) => {
+  const index = usernames.indexOf(username);
+  const avatar = geometricAvatars[index % geometricAvatars.length];
+  
+  const getShapeClass = (shape: string) => {
+    switch (shape) {
+      case 'circle':
+        return 'rounded-full';
+      case 'square':
+        return 'rounded-lg';
+      case 'triangle':
+        return 'transform rotate-45 rounded-sm';
+      case 'hexagon':
+        return 'rounded-lg transform rotate-12';
+      case 'diamond':
+        return 'transform rotate-45 rounded-sm';
+      default:
+        return 'rounded-full';
+    }
+  };
+
+  return (
+    <div className={`w-8 h-8 ${avatar.pattern} ${getShapeClass(avatar.shape)} flex items-center justify-center`}>
+      <div className="w-4 h-4 bg-white/20 rounded-full"></div>
+    </div>
+  );
 };
 
 export function RandomLiveFeed() {
@@ -183,7 +230,7 @@ export function RandomLiveFeed() {
             >
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 mt-0.5">
-                  {getEventIcon(event.type)}
+                  {getGeometricAvatar(event.username)}
                 </div>
                 
                 <div className="flex-1 min-w-0">
