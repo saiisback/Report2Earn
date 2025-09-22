@@ -13,6 +13,7 @@ import uvicorn
 from dotenv import load_dotenv
 from ai_verification_system import AgenticVerificationSystem, GroupDecision
 from content_scraper import ContentScraper
+from web_search_module import WebSearchModule
 
 # Load environment variables
 load_dotenv()
@@ -45,6 +46,11 @@ async def health_check():
 # Initialize the verification system
 verifier = AgenticVerificationSystem()
 
+# Initialize web search module
+import os
+serpapi_key = os.getenv("SERPAPI_API_KEY")
+web_search = WebSearchModule(serpapi_key)
+
 class VerificationRequest(BaseModel):
     content_url: str
     content_text: Optional[str] = ""
@@ -66,6 +72,19 @@ class VerificationResponse(BaseModel):
     success: bool
     result: Optional[GroupDecision] = None
     scraped_content: Optional[ScrapedContent] = None
+    error: Optional[str] = None
+
+class SearchRequest(BaseModel):
+    query: str
+    max_results: Optional[int] = 5
+
+class ImageSearchRequest(BaseModel):
+    image_url: str
+    max_results: Optional[int] = 5
+
+class SearchResponse(BaseModel):
+    success: bool
+    results: Optional[List[dict]] = None
     error: Optional[str] = None
 
 @app.get("/")
@@ -237,6 +256,73 @@ async def health_check():
         "agents_ready": True,
         "openrouter_connected": True
     }
+
+@app.post("/search", response_model=SearchResponse)
+async def search_web(request: SearchRequest):
+    """
+    Search the web for information
+    
+    Args:
+        request: SearchRequest containing query and max_results
+        
+    Returns:
+        SearchResponse with search results
+    """
+    try:
+        print(f"🔍 Searching for: {request.query}")
+        
+        # Perform web search
+        results = await web_search.search_for_text_verification(
+            content_text=request.query,
+            search_queries=[request.query],
+            max_results=request.max_results
+        )
+        
+        return SearchResponse(
+            success=True,
+            results=results,
+            error=None
+        )
+        
+    except Exception as e:
+        return SearchResponse(
+            success=False,
+            results=None,
+            error=str(e)
+        )
+
+@app.post("/search-image", response_model=SearchResponse)
+async def search_image(request: ImageSearchRequest):
+    """
+    Search for similar images on the web
+    
+    Args:
+        request: ImageSearchRequest containing image_url and max_results
+        
+    Returns:
+        SearchResponse with image search results
+    """
+    try:
+        print(f"🖼️ Searching for image: {request.image_url}")
+        
+        # Perform image search
+        results = await web_search.search_for_image_verification(
+            image_urls=[request.image_url],
+            max_results=request.max_results
+        )
+        
+        return SearchResponse(
+            success=True,
+            results=results,
+            error=None
+        )
+        
+    except Exception as e:
+        return SearchResponse(
+            success=False,
+            results=None,
+            error=str(e)
+        )
 
 if __name__ == "__main__":
     uvicorn.run(
