@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 # Import our custom modules
 from image_processor import ImageProcessor
 from content_scraper import ContentScraper
+from web_search_module import WebSearchModule
 
 # Load environment variables
 load_dotenv()
@@ -61,6 +62,10 @@ class VerificationState(BaseModel):
     extracted_texts: List[str] = []
     manipulation_indicators: List[Dict[str, Any]] = []
     
+    # Web search results
+    web_search_results: List[Dict[str, Any]] = []
+    fact_check_results: List[Dict[str, Any]] = []
+    
     # Agent decisions
     fact_checker_decision: Optional[AgentDecision] = None
     image_analyst_decision: Optional[AgentDecision] = None
@@ -77,9 +82,10 @@ class VerificationState(BaseModel):
 
 class AgenticVerificationSystem:
     def __init__(self):
-        # Initialize image processor and content scraper
+        # Initialize image processor, content scraper, and web search module
         self.image_processor = ImageProcessor()
         self.content_scraper = ContentScraper()
+        self.web_search_module = WebSearchModule()
         
         # Initialize multiple OpenRouter clients using free models
         self.models = {
@@ -135,13 +141,15 @@ class AgenticVerificationSystem:
         
         # Add nodes for each verification step using multiple models
         workflow.add_node("image_processing", self._process_images)
+        workflow.add_node("web_search", self._perform_web_search)
         workflow.add_node("multi_model_verification", self._multi_model_verification)
         workflow.add_node("popularity_analysis", self._analyze_popularity)
         workflow.add_node("group_decision", self._group_decision_maker)
         
         # Define the flow
         workflow.set_entry_point("image_processing")
-        workflow.add_edge("image_processing", "multi_model_verification")
+        workflow.add_edge("image_processing", "web_search")
+        workflow.add_edge("web_search", "multi_model_verification")
         workflow.add_edge("multi_model_verification", "popularity_analysis")
         workflow.add_edge("popularity_analysis", "group_decision")
         workflow.add_edge("group_decision", END)
@@ -218,6 +226,65 @@ Provide a detailed analysis that can help determine the authenticity of the cont
         
         return state
     
+    async def _perform_web_search(self, state: VerificationState) -> VerificationState:
+        """Perform web search for fact-checking information"""
+        
+        print(f"🔍 Starting web search for content verification...")
+        print(f"📝 Content text length: {len(state.content_text)} characters")
+        
+        try:
+            # Search for fact-checking information
+            search_results = await self.web_search_module.search_for_fact_check(
+                state.content_text, 
+                state.content_url
+            )
+            
+            # Store search results
+            state.web_search_results = [
+                {
+                    "title": result.title,
+                    "url": result.url,
+                    "snippet": result.snippet,
+                    "source": result.source,
+                    "relevance_score": result.relevance_score
+                }
+                for result in search_results
+            ]
+            
+            # Search for image verification if images exist
+            if state.content_images:
+                print(f"🖼️ Searching for image verification for {len(state.content_images)} images...")
+                for image_url in state.content_images:
+                    image_results = await self.web_search_module.search_for_image_verification(image_url)
+                    state.fact_check_results.extend([
+                        {
+                            "type": "image_verification",
+                            "image_url": image_url,
+                            "title": result.title,
+                            "url": result.url,
+                            "snippet": result.snippet,
+                            "source": result.source,
+                            "relevance_score": result.relevance_score
+                        }
+                        for result in image_results
+                    ])
+            
+            print(f"✅ Web search completed: {len(state.web_search_results)} text results, {len(state.fact_check_results)} image results")
+            
+            # Log search results summary
+            if state.web_search_results:
+                print(f"📊 Top search result: {state.web_search_results[0]['title'][:50]}...")
+                print(f"🔗 Source: {state.web_search_results[0]['source']}")
+                print(f"📈 Relevance: {state.web_search_results[0]['relevance_score']:.2f}")
+            
+        except Exception as e:
+            print(f"❌ Web search failed: {e}")
+            # Continue with verification even if web search fails
+            state.web_search_results = []
+            state.fact_check_results = []
+        
+        return state
+    
     async def _multi_model_verification(self, state: VerificationState) -> VerificationState:
         """Multi-model verification using all 5 free OpenRouter models"""
         
@@ -239,6 +306,32 @@ Provide a detailed analysis that can help determine the authenticity of the cont
             for i, indicator in enumerate(state.manipulation_indicators):
                 manipulation_text += f"Image {i+1}: {indicator.get('analysis', 'No analysis available')}\n"
         
+        # Add web search results
+        web_search_text = ""
+        if state.web_search_results:
+            web_search_text = "\n\n[Web Search Results for Fact-Checking:]\n"
+            for i, result in enumerate(state.web_search_results[:5]):  # Top 5 results
+                web_search_text += f"Result {i+1}:\n"
+                web_search_text += f"Title: {result['title']}\n"
+                web_search_text += f"URL: {result['url']}\n"
+                web_search_text += f"Snippet: {result['snippet']}\n"
+                web_search_text += f"Source: {result['source']}\n"
+                web_search_text += f"Relevance: {result['relevance_score']:.2f}\n"
+                web_search_text += "---\n"
+        
+        # Add image verification results
+        image_verification_text = ""
+        if state.fact_check_results:
+            image_verification_text = "\n\n[Image Verification Search Results:]\n"
+            for i, result in enumerate(state.fact_check_results[:3]):  # Top 3 image results
+                image_verification_text += f"Image Verification {i+1}:\n"
+                image_verification_text += f"Image URL: {result['image_url']}\n"
+                image_verification_text += f"Title: {result['title']}\n"
+                image_verification_text += f"URL: {result['url']}\n"
+                image_verification_text += f"Snippet: {result['snippet']}\n"
+                image_verification_text += f"Source: {result['source']}\n"
+                image_verification_text += "---\n"
+        
         # Create verification prompt
         prompt = ChatPromptTemplate.from_messages([
             SystemMessage(content="""You are an AI content verification expert. Analyze the given content and determine if it's authentic, fake, or uncertain.
@@ -251,6 +344,9 @@ Your analysis should cover:
 5. Overall authenticity assessment
 6. Image content analysis and text extraction results
 7. Any signs of AI-generated or manipulated content
+8. Web search results and fact-checking information
+9. Cross-reference claims with available online sources
+10. Consider the reliability and relevance of search results
 
 IMPORTANT: You MUST respond with ONLY valid JSON in this exact format:
 {
@@ -266,7 +362,7 @@ Do not include any text outside the JSON object."""),
             HumanMessage(content=f"""Content to verify:
 URL: {state.content_url}
 Text: {state.content_text}
-Images: {state.content_images if state.content_images else "None"}{image_analysis_text}{manipulation_text}
+Images: {state.content_images if state.content_images else "None"}{image_analysis_text}{manipulation_text}{web_search_text}{image_verification_text}
 
 Analyze this content and respond with ONLY the JSON format specified above.""")
         ])
@@ -837,6 +933,7 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
         """Cleanup resources"""
         if hasattr(self, 'content_scraper'):
             self.content_scraper.close()
+        # Web search module doesn't need cleanup as it uses aiohttp sessions
 
 # Example usage and API endpoint
 async def main():
