@@ -10,8 +10,12 @@ from pydantic import BaseModel
 from typing import List, Optional
 import asyncio
 import uvicorn
+from dotenv import load_dotenv
 from ai_verification_system import AgenticVerificationSystem, GroupDecision
 from content_scraper import ContentScraper
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(
     title="Agentic AI Verification System",
