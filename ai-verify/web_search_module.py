@@ -28,8 +28,9 @@ class WebSearchModule:
         # Initialize SerpAPI key (passed from main system)
         self.serpapi_key = serpapi_key or os.getenv("SERPAPI_API_KEY")
         
+        print(f"🔍 WebSearchModule initialized with key: {bool(self.serpapi_key)}")
         if self.serpapi_key:
-            print("✅ Using SerpAPI for web search")
+            print(f"✅ Using SerpAPI for web search (key: {self.serpapi_key[:10]}...)")
         else:
             print("❌ SERPAPI_API_KEY not found - web search will not work")
             print("   Please set SERPAPI_API_KEY in your .env file")
