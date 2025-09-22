@@ -86,8 +86,26 @@ class AgenticVerificationSystem:
         self.image_processor = ImageProcessor()
         self.content_scraper = ContentScraper()
         
-        # Get SerpAPI key from environment
-        serpapi_key = os.getenv("SERPAPI_API_KEY")
+        # Debug environment variables
+        print(f"🔍 Environment Debug:")
+        print(f"   All env vars containing 'API': {[k for k in os.environ.keys() if 'API' in k]}")
+        print(f"   SERPAPI_API_KEY exists: {bool(os.getenv('SERPAPI_API_KEY'))}")
+        print(f"   OPENROUTER_API_KEY exists: {bool(os.getenv('OPENROUTER_API_KEY'))}")
+        
+        # Get SerpAPI key from environment (try multiple possible names)
+        serpapi_key = (
+            os.getenv("SERPAPI_API_KEY") or 
+            os.getenv("SERPAPI_KEY") or 
+            os.getenv("SERP_API_KEY")
+        )
+        
+        # Fallback for Railway deployment (temporary)
+        if not serpapi_key:
+            print("⚠️ No SerpAPI key found in environment, using fallback")
+            serpapi_key = "27a0a1f71c847bfb0af9e970b2cfcc77badbb10fe456d4a9ac758d2b6190be19"
+        
+        print(f"   SerpAPI key value: {serpapi_key[:10] + '...' if serpapi_key else 'None'}")
+        
         self.web_search_module = WebSearchModule(serpapi_key)
         
         # Initialize multiple OpenRouter clients using free models
