@@ -93,15 +93,7 @@ class AgenticVerificationSystem:
         print(f"   OPENROUTER_API_KEY exists: {bool(os.getenv('OPENROUTER_API_KEY'))}")
         
         # Get SerpAPI key from environment (try multiple possible names)
-        serpapi_key = (
-            os.getenv("SERPAPI_API_KEY") or 
-            os.getenv("SERPAPI_KEY") or 
-            os.getenv("SERP_API_KEY")
-        )
         
-        # Fallback for Railway deployment (temporary)
-        if not serpapi_key:
-            print("⚠️ No SerpAPI key found in environment, using fallback")
             serpapi_key = "27a0a1f71c847bfb0af9e970b2cfcc77badbb10fe456d4a9ac758d2b6190be19"
         
         print(f"   SerpAPI key value: {serpapi_key[:10] + '...' if serpapi_key else 'None'}")

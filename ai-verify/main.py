@@ -38,10 +38,6 @@ app.add_middleware(
 )
 
 # Health check endpoint
-@app.get("/")
-async def root():
-    return {"message": "AI Verification System is running", "status": "healthy"}
-
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "ai-verification"}
@@ -244,7 +240,7 @@ async def health_check():
 
 if __name__ == "__main__":
     uvicorn.run(
-        "api_server:app",
+        "main:app",
         host="0.0.0.0",
         port=8000,
         reload=True
