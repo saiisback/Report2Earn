@@ -24,19 +24,14 @@ class SearchResult:
 
 class WebSearchModule:
     def __init__(self):
-        # Initialize search APIs
+        # Initialize SerpAPI
         self.serpapi_key = os.getenv("SERPAPI_API_KEY")
-        self.google_api_key = os.getenv("GOOGLE_API_KEY")
-        self.google_cse_id = os.getenv("GOOGLE_CSE_ID")
-        self.bing_api_key = os.getenv("BING_API_KEY")
         
-        # Fallback to free search if no API keys
-        self.use_free_search = not any([self.serpapi_key, self.google_api_key, self.bing_api_key])
-        
-        if self.use_free_search:
-            print("🔍 Using free web search (limited functionality)")
+        if self.serpapi_key:
+            print("🔍 Using SerpAPI for web search")
         else:
-            print("🔍 Web search APIs configured")
+            print("❌ SERPAPI_API_KEY not found - web search will not work")
+            print("   Please set SERPAPI_API_KEY in your .env file")
     
     async def search_for_fact_check(self, content_text: str, content_url: str = "") -> List[SearchResult]:
         """
@@ -56,30 +51,22 @@ class WebSearchModule:
         
         all_results = []
         
-        # Search with multiple queries in parallel
-        tasks = []
-        for query in search_queries[:3]:  # Limit to top 3 queries
-            if self.serpapi_key:
-                tasks.append(self._search_serpapi(query))
-            elif self.google_api_key and self.google_cse_id:
-                tasks.append(self._search_google_custom(query))
-            elif self.bing_api_key:
-                tasks.append(self._search_bing(query))
-            else:
-                tasks.append(self._search_free(query))
-        
-        # Wait for all searches to complete
-        search_results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Process results
-        for i, result in enumerate(search_results):
-            if isinstance(result, Exception):
-                print(f"❌ Search query {i+1} failed: {result}")
-                continue
-            
-            if result:
-                all_results.extend(result)
-                print(f"✅ Search query {i+1} returned {len(result)} results")
+        # Search with SerpAPI
+        if self.serpapi_key:
+            print(f"🚀 Using SerpAPI to search for {len(search_queries)} queries...")
+            for i, query in enumerate(search_queries[:3]):  # Limit to top 3 queries
+                print(f"🔍 Searching query {i+1}: {query}")
+                try:
+                    results = await self._search_serpapi(query)
+                    if results:
+                        all_results.extend(results)
+                        print(f"✅ Query {i+1} returned {len(results)} results")
+                    else:
+                        print(f"⚠️ Query {i+1} returned no results")
+                except Exception as e:
+                    print(f"❌ Query {i+1} failed: {e}")
+        else:
+            print("❌ SerpAPI key not available, cannot perform web search")
         
         # Remove duplicates and rank by relevance
         unique_results = self._deduplicate_results(all_results)
@@ -87,6 +74,48 @@ class WebSearchModule:
         
         print(f"📊 Total unique results: {len(ranked_results)}")
         return ranked_results[:10]  # Return top 10 results
+    
+    async def _search_serpapi(self, query: str) -> List[SearchResult]:
+        """Search using SerpAPI"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                params = {
+                    'q': query,
+                    'api_key': self.serpapi_key,
+                    'engine': 'google',
+                    'num': 10,
+                    'gl': 'us',
+                    'hl': 'en'
+                }
+                
+                async with session.get('https://serpapi.com/search', params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return self._parse_serpapi_results(data)
+                    else:
+                        print(f"❌ SerpAPI error: {response.status}")
+                        return []
+        except Exception as e:
+            print(f"❌ SerpAPI search failed: {e}")
+            return []
+    
+    def _parse_serpapi_results(self, data: Dict) -> List[SearchResult]:
+        """Parse SerpAPI search results"""
+        results = []
+        
+        if 'organic_results' in data:
+            for item in data['organic_results']:
+                result = SearchResult(
+                    title=item.get('title', ''),
+                    url=item.get('link', ''),
+                    snippet=item.get('snippet', ''),
+                    source='SerpAPI',
+                    relevance_score=0.8
+                )
+                results.append(result)
+        
+        return results
+    
     
     def _generate_search_queries(self, content_text: str, content_url: str = "") -> List[str]:
         """Generate search queries from content text"""
@@ -173,138 +202,6 @@ class WebSearchModule:
         except:
             return None
     
-    async def _search_serpapi(self, query: str) -> List[SearchResult]:
-        """Search using SerpAPI"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                params = {
-                    'q': query,
-                    'api_key': self.serpapi_key,
-                    'engine': 'google',
-                    'num': 10,
-                    'gl': 'us',
-                    'hl': 'en'
-                }
-                
-                async with session.get('https://serpapi.com/search', params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return self._parse_serpapi_results(data)
-                    else:
-                        print(f"❌ SerpAPI error: {response.status}")
-                        return []
-        except Exception as e:
-            print(f"❌ SerpAPI search failed: {e}")
-            return []
-    
-    async def _search_google_custom(self, query: str) -> List[SearchResult]:
-        """Search using Google Custom Search API"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                params = {
-                    'key': self.google_api_key,
-                    'cx': self.google_cse_id,
-                    'q': query,
-                    'num': 10
-                }
-                
-                async with session.get('https://www.googleapis.com/customsearch/v1', params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return self._parse_google_results(data)
-                    else:
-                        print(f"❌ Google Custom Search error: {response.status}")
-                        return []
-        except Exception as e:
-            print(f"❌ Google Custom Search failed: {e}")
-            return []
-    
-    async def _search_bing(self, query: str) -> List[SearchResult]:
-        """Search using Bing Search API"""
-        try:
-            headers = {'Ocp-Apim-Subscription-Key': self.bing_api_key}
-            params = {'q': query, 'count': 10, 'mkt': 'en-US'}
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.get('https://api.bing.microsoft.com/v7.0/search', 
-                                    headers=headers, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return self._parse_bing_results(data)
-                    else:
-                        print(f"❌ Bing Search error: {response.status}")
-                        return []
-        except Exception as e:
-            print(f"❌ Bing Search failed: {e}")
-            return []
-    
-    async def _search_free(self, query: str) -> List[SearchResult]:
-        """Fallback free search (limited functionality)"""
-        # This is a placeholder for free search implementation
-        # In practice, you might use DuckDuckGo or other free APIs
-        print(f"🔍 Free search for: {query}")
-        
-        # Return mock results for demonstration
-        return [
-            SearchResult(
-                title=f"Search result for: {query[:50]}...",
-                url="https://example.com/search-result",
-                snippet=f"This is a mock search result for the query: {query}",
-                source="Free Search",
-                relevance_score=0.5
-            )
-        ]
-    
-    def _parse_serpapi_results(self, data: Dict) -> List[SearchResult]:
-        """Parse SerpAPI search results"""
-        results = []
-        
-        if 'organic_results' in data:
-            for item in data['organic_results']:
-                result = SearchResult(
-                    title=item.get('title', ''),
-                    url=item.get('link', ''),
-                    snippet=item.get('snippet', ''),
-                    source='SerpAPI',
-                    relevance_score=0.8
-                )
-                results.append(result)
-        
-        return results
-    
-    def _parse_google_results(self, data: Dict) -> List[SearchResult]:
-        """Parse Google Custom Search results"""
-        results = []
-        
-        if 'items' in data:
-            for item in data['items']:
-                result = SearchResult(
-                    title=item.get('title', ''),
-                    url=item.get('link', ''),
-                    snippet=item.get('snippet', ''),
-                    source='Google Custom Search',
-                    relevance_score=0.8
-                )
-                results.append(result)
-        
-        return results
-    
-    def _parse_bing_results(self, data: Dict) -> List[SearchResult]:
-        """Parse Bing Search results"""
-        results = []
-        
-        if 'webPages' in data and 'value' in data['webPages']:
-            for item in data['webPages']['value']:
-                result = SearchResult(
-                    title=item.get('name', ''),
-                    url=item.get('url', ''),
-                    snippet=item.get('snippet', ''),
-                    source='Bing Search',
-                    relevance_score=0.8
-                )
-                results.append(result)
-        
-        return results
     
     def _deduplicate_results(self, results: List[SearchResult]) -> List[SearchResult]:
         """Remove duplicate search results"""
@@ -348,20 +245,54 @@ class WebSearchModule:
         return sorted(results, key=lambda x: x.relevance_score, reverse=True)
     
     async def search_for_image_verification(self, image_url: str) -> List[SearchResult]:
-        """Search for image verification information"""
+        """Search for image verification using SerpAPI"""
         print(f"🔍 Searching for image verification: {image_url}")
         
-        # This would typically use reverse image search APIs
-        # For now, return a placeholder
-        return [
-            SearchResult(
-                title="Image Verification Search",
-                url="https://example.com/image-search",
-                snippet="This is a placeholder for image verification search results",
-                source="Image Search",
-                relevance_score=0.5
-            )
-        ]
+        if not self.serpapi_key:
+            print("❌ SerpAPI key not available for image search")
+            return []
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                params = {
+                    'engine': 'google_reverse_image',
+                    'image_url': image_url,
+                    'api_key': self.serpapi_key,
+                    'num': 5
+                }
+                
+                async with session.get('https://serpapi.com/search', params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return self._parse_serpapi_image_results(data)
+                    else:
+                        print(f"❌ SerpAPI image search error: {response.status}")
+                        return []
+        except Exception as e:
+            print(f"❌ SerpAPI image search failed: {e}")
+            return []
+    
+    def _parse_serpapi_image_results(self, data: Dict) -> List[SearchResult]:
+        """Parse SerpAPI image search results"""
+        results = []
+        
+        if 'image_results' in data:
+            for item in data['image_results'][:5]:  # Limit to 5 results
+                result = SearchResult(
+                    title=item.get('title', 'Image Search Result'),
+                    url=item.get('link', ''),
+                    snippet=item.get('snippet', 'Image verification result'),
+                    source='SerpAPI Images',
+                    relevance_score=0.7
+                )
+                results.append(result)
+        
+        return results
+    
+    def close(self):
+        """Close method for compatibility"""
+        # SerpAPI doesn't need cleanup
+        pass
     
     def format_search_results_for_ai(self, search_results: List[SearchResult]) -> str:
         """Format search results for AI analysis"""

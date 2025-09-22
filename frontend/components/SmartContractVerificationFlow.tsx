@@ -11,7 +11,7 @@ import { PlaceholdersAndVanishInput } from '@/components/input-front';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, ExternalLink, Brain, Shield, CheckCircle, XCircle, AlertTriangle, BarChart3, Users, FileText } from 'lucide-react';
+import { Loader2, ExternalLink, Brain, Shield, CheckCircle, XCircle, AlertTriangle, BarChart3, Users, FileText, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import WalletConnection from '@/components/WalletConnection';
 import { MultiStepLoader } from '@/components/step-loader';
@@ -19,12 +19,21 @@ import { BentoGrid, BentoCard } from '@/components/bentogrid';
 import { AnimatePresence, motion } from 'motion/react';
 import { useOutsideClick } from '@/hooks/use-outside-click';
 import { Confetti, ConfettiButton } from '@/components/confetti';
+import WebSearchResults from '@/components/WebSearchResults';
 
 // Smart contract details are imported from lib/algorand.ts
 
 type VerificationStatus = 'idle' | 'opting-in' | 'depositing' | 'verifying' | 'claiming' | 'completed' | 'error';
 
 // Type definitions for verification results
+interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  source: string;
+  relevance_score: number;
+}
+
 interface VerificationResult {
   final_decision: string | {
     value: 'authentic' | 'fake' | 'uncertain';
@@ -34,6 +43,7 @@ interface VerificationResult {
   group_reasoning: string;
   popularity_score?: number;
   dynamic_reward?: number;
+  web_search_results?: WebSearchResult[];
   individual_decisions?: Array<{
     agent_name: string;
     decision: 'authentic' | 'fake' | 'uncertain';
@@ -83,8 +93,9 @@ const loadingStates = [
   { text: "Connecting to blockchain..." },
   { text: "Depositing 1 ALGO verification fee..." },
   { text: "AI agents analyzing content..." },
-  { text: "Analyzing content popularity..." },
+  { text: "Searching web for fact-checking sources..." },
   { text: "Cross-referencing multiple sources..." },
+  { text: "Analyzing content popularity..." },
   { text: "Generating verification report..." },
   { text: "Calculating dynamic reward..." },
   { text: "Sending reward transaction..." },
@@ -899,6 +910,75 @@ const SmartContractVerificationFlow: React.FC = () => {
               </div>
             </motion.div>
 
+            {/* Web Search Results Card */}
+            <motion.div
+              layoutId={`card-web-search`}
+              onClick={() => setActiveCard({
+                id: 'web-search',
+                name: 'Web Search Analysis',
+                description: `Found ${verificationResult.web_search_results?.length || 0} fact-checking sources`,
+                decision: 'info',
+                Icon: Search,
+                content: (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">Search Sources</h4>
+                      <p className="text-white/80">{verificationResult.web_search_results?.length || 0} sources found</p>
+                    </div>
+                    <div className="p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                      <h4 className="text-white font-semibold mb-2">AI Enhancement</h4>
+                      <p className="text-white/80">These sources were used by AI agents to make more accurate decisions</p>
+                    </div>
+                    {verificationResult.web_search_results && verificationResult.web_search_results.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-white font-semibold">Top Sources:</h4>
+                        {verificationResult.web_search_results.slice(0, 3).map((result, idx) => (
+                          <div key={idx} className="p-3 bg-white/5 rounded border border-white/10">
+                            <p className="text-white/90 text-sm font-medium">{result.title}</p>
+                            <p className="text-white/70 text-xs mt-1">{result.snippet.substring(0, 100)}...</p>
+                            <p className="text-white/60 text-xs mt-1">Relevance: {Math.round(result.relevance_score * 100)}%</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              className="col-span-1 p-6 rounded-2xl cursor-pointer transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl relative overflow-hidden group bg-gradient-to-br from-cyan-500/30 via-blue-600/20 to-indigo-700/30 border border-cyan-400/40 shadow-cyan-500/20"
+              whileHover={{ y: -5 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {/* Animated background gradient */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-cyan-400/20 to-blue-600/20" />
+              
+              <motion.div 
+                layoutId={`image-web-search`}
+                className="h-20 w-20 rounded-2xl mb-4 flex items-center justify-center relative z-10 bg-gradient-to-br from-cyan-500/40 to-blue-600/40 shadow-lg shadow-cyan-500/30"
+                whileHover={{ rotate: 5, scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <Search className="h-10 w-10 text-white drop-shadow-lg" />
+              </motion.div>
+              
+              <motion.h3
+                layoutId={`title-web-search`}
+                className="font-bold text-white text-xl mb-3 relative z-10"
+              >
+                Web Search Analysis
+              </motion.h3>
+              <motion.p
+                layoutId={`description-web-search`}
+                className="text-white/90 text-sm leading-relaxed relative z-10"
+              >
+                Found <span className="font-semibold text-cyan-300">{verificationResult.web_search_results?.length || 0}</span> fact-checking sources
+              </motion.p>
+              
+              {/* Decorative elements */}
+              <div className="absolute top-4 right-4 opacity-20 group-hover:opacity-40 transition-opacity duration-300">
+                <Search className="h-6 w-6 text-white" />
+              </div>
+            </motion.div>
+
             {/* Individual Agent Analysis Cards */}
             {verificationResult.individual_decisions && verificationResult.individual_decisions.map((decision: any, index: number) => (
               <motion.div
@@ -1023,6 +1103,17 @@ const SmartContractVerificationFlow: React.FC = () => {
               </motion.div>
             ))}
           </div>
+
+          {/* Web Search Results Section */}
+          {verificationResult.web_search_results && verificationResult.web_search_results.length > 0 && (
+            <div className="mt-12">
+              <h3 className="text-2xl font-bold text-white mb-6 text-center">Web Search Analysis</h3>
+              <WebSearchResults 
+                searchResults={verificationResult.web_search_results} 
+                isLoading={false}
+              />
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex justify-center gap-4 mt-8">

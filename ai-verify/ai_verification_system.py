@@ -933,7 +933,8 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
         """Cleanup resources"""
         if hasattr(self, 'content_scraper'):
             self.content_scraper.close()
-        # Web search module doesn't need cleanup as it uses aiohttp sessions
+        if hasattr(self, 'web_search_module'):
+            self.web_search_module.close()
 
 # Example usage and API endpoint
 async def main():
