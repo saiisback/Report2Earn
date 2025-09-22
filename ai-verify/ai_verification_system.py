@@ -85,7 +85,10 @@ class AgenticVerificationSystem:
         # Initialize image processor, content scraper, and web search module
         self.image_processor = ImageProcessor()
         self.content_scraper = ContentScraper()
-        self.web_search_module = WebSearchModule()
+        
+        # Get SerpAPI key from environment
+        serpapi_key = os.getenv("SERPAPI_API_KEY")
+        self.web_search_module = WebSearchModule(serpapi_key)
         
         # Initialize multiple OpenRouter clients using free models
         self.models = {

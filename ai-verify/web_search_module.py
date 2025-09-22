@@ -13,11 +13,7 @@ from datetime import datetime
 from urllib.parse import quote_plus
 import re
 from dataclasses import dataclass
-from dotenv import load_dotenv
-
-# Load environment variables from the correct path
-env_path = os.path.join(os.path.dirname(__file__), '.env')
-load_dotenv(env_path)
+# Environment variables are loaded in the main verification system
 
 @dataclass
 class SearchResult:
@@ -28,24 +24,15 @@ class SearchResult:
     relevance_score: float = 0.0
 
 class WebSearchModule:
-    def __init__(self):
-        # Debug environment variable loading
-        print(f"🔍 Environment check:")
-        print(f"   Current working directory: {os.getcwd()}")
-        print(f"   .env file exists: {os.path.exists('.env')}")
-        print(f"   .env file exists (full path): {os.path.exists(env_path)}")
+    def __init__(self, serpapi_key: Optional[str] = None):
+        # Initialize SerpAPI key (passed from main system)
+        self.serpapi_key = serpapi_key or os.getenv("SERPAPI_API_KEY")
         
-        # Initialize SerpAPI
-        self.serpapi_key = os.getenv("SERPAPI_API_KEY")
-        
-        print(f"   SERPAPI_API_KEY exists: {bool(self.serpapi_key)}")
         if self.serpapi_key:
-            print(f"   Key value: {self.serpapi_key[:10]}...")
             print("✅ Using SerpAPI for web search")
         else:
             print("❌ SERPAPI_API_KEY not found - web search will not work")
             print("   Please set SERPAPI_API_KEY in your .env file")
-            print("   Make sure .env file is in the ai-verify directory")
     
     async def search_for_fact_check(self, content_text: str, content_url: str = "") -> List[SearchResult]:
         """
