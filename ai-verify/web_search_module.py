@@ -72,9 +72,11 @@ class WebSearchModule:
         
         # Remove duplicates and rank by relevance
         unique_results = self._deduplicate_results(all_results)
-        ranked_results = self._rank_results(unique_results, content_text)
+        ranked_results = self._rank_results(unique_results)
         
         print(f"📊 Total unique results: {len(ranked_results)}")
+        if ranked_results:
+            print(f"🔍 Top sources: {[r.source for r in ranked_results[:3]]}")
         return ranked_results[:10]  # Return top 10 results
     
     async def _search_serpapi(self, query: str) -> List[SearchResult]:
@@ -132,31 +134,52 @@ class WebSearchModule:
     
     
     def _generate_search_queries(self, content_text: str, content_url: str = "") -> List[str]:
-        """Generate search queries from content text"""
+        """Generate fact-checking focused search queries from content text"""
         
         # Extract key phrases and entities
         key_phrases = self._extract_key_phrases(content_text)
+        claims = self._extract_claims(content_text)
+        topics = self._extract_topics(content_text)
         
         queries = []
         
-        # Original content query
+        # 1. Direct fact-check queries with reliable sources
         if content_text:
             # Clean and truncate content for search
             clean_text = re.sub(r'[^\w\s]', ' ', content_text)
-            clean_text = ' '.join(clean_text.split()[:20])  # First 20 words
+            clean_text = ' '.join(clean_text.split()[:15])  # First 15 words
+            
+            # Fact-check with reliable sources
+            queries.append(f'"{clean_text}" site:snopes.com')
+            queries.append(f'"{clean_text}" site:politifact.com')
+            queries.append(f'"{clean_text}" site:reuters.com')
+            queries.append(f'"{clean_text}" site:bbc.com')
+            queries.append(f'"{clean_text}" site:apnews.com')
             queries.append(f'"{clean_text}" fact check')
+            queries.append(f'"{clean_text}" verification')
         
-        # Key phrases with fact check
+        # 2. Key phrases with fact-checking focus
         for phrase in key_phrases[:3]:
             if len(phrase) > 10:  # Only use substantial phrases
-                queries.append(f'"{phrase}" fact check verification')
+                queries.append(f'"{phrase}" fact check snopes politifact')
+                queries.append(f'"{phrase}" verification reuters bbc')
+                queries.append(f'"{phrase}" true false')
         
-        # Claims-based queries
-        claims = self._extract_claims(content_text)
+        # 3. Claims-based queries with reliable sources
         for claim in claims[:2]:
-            queries.append(f'"{claim}" true false verification')
+            if len(claim) > 15:  # Substantial claims only
+                queries.append(f'"{claim}" site:snopes.com')
+                queries.append(f'"{claim}" site:politifact.com')
+                queries.append(f'"{claim}" fact check verification')
+                queries.append(f'"{claim}" reuters bbc ap news')
         
-        # Source verification queries
+        # 4. Topic-based verification queries
+        for topic in topics[:2]:
+            if len(topic) > 10:
+                queries.append(f'"{topic}" latest news verification')
+                queries.append(f'"{topic}" fact check')
+        
+        # 5. Source verification queries
         if content_url:
             domain = self._extract_domain(content_url)
             if domain:
@@ -189,23 +212,100 @@ class WebSearchModule:
     
     def _extract_claims(self, text: str) -> List[str]:
         """Extract factual claims from text"""
-        # Look for statements that could be fact-checked
-        claim_indicators = [
-            r'([^.!?]*(?:is|are|was|were|will be|has been|have been)[^.!?]*)',
-            r'([^.!?]*(?:scientists|research|study|study shows|according to)[^.!?]*)',
-            r'([^.!?]*(?:discovered|found|revealed|proven)[^.!?]*)',
-            r'([^.!?]*(?:breaking|exclusive|shocking)[^.!?]*)'
-        ]
-        
         claims = []
-        for pattern in claim_indicators:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            for match in matches:
-                clean_claim = match.strip()
-                if len(clean_claim) > 20 and len(clean_claim) < 200:
-                    claims.append(clean_claim)
         
-        return claims[:3]  # Top 3 claims
+        # Look for statements that could be fact-checked
+        sentences = re.split(r'[.!?]+', text)
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if len(sentence) > 20:  # Substantial sentences
+                # Look for factual indicators
+                if any(word in sentence.lower() for word in ['said', 'claims', 'reports', 'according to', 'study shows', 'research', 'data', 'statistics', 'percent', '%', 'million', 'billion']):
+                    claims.append(sentence)
+        
+        return claims[:5]  # Top 5 claims
+    
+    def _extract_topics(self, text: str) -> List[str]:
+        """Extract main topics from text"""
+        topics = []
+        
+        # Look for capitalized words (potential proper nouns)
+        words = text.split()
+        for word in words:
+            if word[0].isupper() and len(word) > 3:
+                topics.append(word)
+        
+        # Look for common topic indicators
+        topic_indicators = ['law', 'policy', 'government', 'court', 'judge', 'legal', 'bill', 'act', 'regulation', 'rule', 'law', 'crime', 'police', 'arrest', 'trial', 'verdict', 'sentence']
+        
+        for indicator in topic_indicators:
+            if indicator in text.lower():
+                # Extract surrounding context
+                start = text.lower().find(indicator)
+                if start != -1:
+                    # Get 5 words before and after
+                    words = text.split()
+                    for i, word in enumerate(words):
+                        if indicator in word.lower():
+                            context_start = max(0, i - 2)
+                            context_end = min(len(words), i + 3)
+                            topic = ' '.join(words[context_start:context_end])
+                            if len(topic) > 10:
+                                topics.append(topic)
+                            break
+        
+        return topics[:3]  # Top 3 topics
+    
+    def _rank_results(self, results: List[SearchResult]) -> List[SearchResult]:
+        """Rank search results by reliability and relevance"""
+        # Reliable sources get higher priority
+        reliable_domains = {
+            'snopes.com': 1.0,
+            'politifact.com': 1.0,
+            'reuters.com': 0.9,
+            'bbc.com': 0.9,
+            'apnews.com': 0.9,
+            'factcheck.org': 0.9,
+            'washingtonpost.com': 0.8,
+            'nytimes.com': 0.8,
+            'theguardian.com': 0.8,
+            'npr.org': 0.8,
+            'cbsnews.com': 0.7,
+            'abcnews.go.com': 0.7,
+            'cnn.com': 0.6,
+            'foxnews.com': 0.6,
+            'msnbc.com': 0.6
+        }
+        
+        for result in results:
+            # Base relevance score
+            relevance = result.relevance_score
+            
+            # Boost for reliable sources
+            domain = self._extract_domain(result.url)
+            if domain in reliable_domains:
+                relevance *= reliable_domains[domain]
+            
+            # Boost for fact-checking keywords
+            fact_keywords = ['fact check', 'verification', 'true', 'false', 'misinformation', 'debunked', 'verified']
+            title_lower = result.title.lower()
+            snippet_lower = result.snippet.lower()
+            
+            for keyword in fact_keywords:
+                if keyword in title_lower:
+                    relevance *= 1.2
+                if keyword in snippet_lower:
+                    relevance *= 1.1
+            
+            # Boost for recent content (if date available)
+            if '2024' in result.title or '2024' in result.snippet:
+                relevance *= 1.1
+            
+            result.relevance_score = relevance
+        
+        # Sort by relevance score
+        return sorted(results, key=lambda x: x.relevance_score, reverse=True)
     
     def _extract_domain(self, url: str) -> Optional[str]:
         """Extract domain from URL"""
