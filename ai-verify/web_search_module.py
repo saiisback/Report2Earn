@@ -92,6 +92,8 @@ class WebSearchModule:
     async def _search_serpapi(self, query: str) -> List[SearchResult]:
         """Search using SerpAPI"""
         try:
+            print(f"🔍 Making SerpAPI request for: {query[:50]}...")
+            
             async with aiohttp.ClientSession() as session:
                 params = {
                     'q': query,
@@ -102,15 +104,25 @@ class WebSearchModule:
                     'hl': 'en'
                 }
                 
+                print(f"📡 Requesting: https://serpapi.com/search")
+                
                 async with session.get('https://serpapi.com/search', params=params) as response:
+                    print(f"📊 Response status: {response.status}")
+                    
                     if response.status == 200:
                         data = await response.json()
+                        print(f"✅ Received data with keys: {list(data.keys())}")
                         return self._parse_serpapi_results(data)
                     else:
-                        print(f"❌ SerpAPI error: {response.status}")
+                        error_text = await response.text()
+                        print(f"❌ SerpAPI error: {response.status} - {error_text}")
                         return []
+        except aiohttp.ClientError as e:
+            print(f"❌ SerpAPI client error: {e}")
+            return []
         except Exception as e:
             print(f"❌ SerpAPI search failed: {e}")
+            print(f"Error type: {type(e).__name__}")
             return []
     
     def _parse_serpapi_results(self, data: Dict) -> List[SearchResult]:
@@ -267,6 +279,8 @@ class WebSearchModule:
             return []
         
         try:
+            print(f"🔍 Making SerpAPI image search request for: {image_url}")
+            
             async with aiohttp.ClientSession() as session:
                 params = {
                     'engine': 'google_reverse_image',
@@ -275,15 +289,25 @@ class WebSearchModule:
                     'num': 5
                 }
                 
+                print(f"📡 Requesting image search: https://serpapi.com/search")
+                
                 async with session.get('https://serpapi.com/search', params=params) as response:
+                    print(f"📊 Image search response status: {response.status}")
+                    
                     if response.status == 200:
                         data = await response.json()
+                        print(f"✅ Received image data with keys: {list(data.keys())}")
                         return self._parse_serpapi_image_results(data)
                     else:
-                        print(f"❌ SerpAPI image search error: {response.status}")
+                        error_text = await response.text()
+                        print(f"❌ SerpAPI image search error: {response.status} - {error_text}")
                         return []
+        except aiohttp.ClientError as e:
+            print(f"❌ SerpAPI image search client error: {e}")
+            return []
         except Exception as e:
             print(f"❌ SerpAPI image search failed: {e}")
+            print(f"Error type: {type(e).__name__}")
             return []
     
     def _parse_serpapi_image_results(self, data: Dict) -> List[SearchResult]:
