@@ -50,6 +50,7 @@ class GroupDecision:
     group_reasoning: str
     popularity_score: float = 0.0
     dynamic_reward: float = 0.0
+    web_search_results: List[Dict[str, Any]] = None
 
 class VerificationState(BaseModel):
     content_url: str
@@ -713,7 +714,8 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
                 confidence=0.0,
                 consensus_score=0.0,
                 individual_decisions=[],
-                group_reasoning="No valid decisions from models"
+                group_reasoning="No valid decisions from models",
+                web_search_results=state.web_search_results
             )
             state.verification_complete = True
             return state
@@ -734,7 +736,8 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
                 confidence=0.0,
                 consensus_score=0.0,
                 individual_decisions=valid_decisions,
-                group_reasoning=f"Insufficient successful model responses ({len(successful_decisions)}/{len(valid_decisions)}). Need at least {min_models} successful models for reliable consensus."
+                group_reasoning=f"Insufficient successful model responses ({len(successful_decisions)}/{len(valid_decisions)}). Need at least {min_models} successful models for reliable consensus.",
+                web_search_results=state.web_search_results
             )
             state.verification_complete = True
             return state
@@ -830,7 +833,8 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
             individual_decisions=valid_decisions,
             group_reasoning=group_reasoning,
             popularity_score=state.popularity_score,
-            dynamic_reward=dynamic_reward
+            dynamic_reward=dynamic_reward,
+            web_search_results=state.web_search_results
         )
         
         print(f"🎉 Group decision created successfully!")
@@ -934,7 +938,8 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
                     confidence=0.0,
                     consensus_score=0.0,
                     individual_decisions=[],
-                    group_reasoning="Workflow execution failed"
+                    group_reasoning="Workflow execution failed",
+                    web_search_results=[]
                 )
         else:
             print(f"📋 Result is VerificationState object, accessing group_decision...")
@@ -949,7 +954,8 @@ Analyze this content and respond with ONLY the JSON format specified above.""")
                     confidence=0.0,
                     consensus_score=0.0,
                     individual_decisions=[],
-                    group_reasoning="Workflow execution failed - no group_decision attribute"
+                    group_reasoning="Workflow execution failed - no group_decision attribute",
+                    web_search_results=[]
                 )
     
     def cleanup(self):

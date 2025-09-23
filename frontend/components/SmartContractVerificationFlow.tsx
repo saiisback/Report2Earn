@@ -1105,15 +1105,13 @@ const SmartContractVerificationFlow: React.FC = () => {
           </div>
 
           {/* Web Search Results Section */}
-          {verificationResult.web_search_results && verificationResult.web_search_results.length > 0 && (
-            <div className="mt-12">
-              <h3 className="text-2xl font-bold text-white mb-6 text-center">Web Search Analysis</h3>
-              <WebSearchResults 
-                searchResults={verificationResult.web_search_results} 
-                isLoading={false}
-              />
-            </div>
-          )}
+          <div className="mt-12">
+            <h3 className="text-2xl font-bold text-white mb-6 text-center">Web Search Analysis</h3>
+            <WebSearchResults 
+              searchResults={verificationResult.web_search_results || []} 
+              isLoading={false}
+            />
+          </div>
 
           {/* Action Buttons */}
           <div className="flex justify-center gap-4 mt-8">

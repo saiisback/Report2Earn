@@ -23,6 +23,7 @@ const WebSearchResults: React.FC<WebSearchResultsProps> = ({
   searchResults, 
   isLoading = false 
 }) => {
+
   if (isLoading) {
     return (
       <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
@@ -50,7 +51,11 @@ const WebSearchResults: React.FC<WebSearchResultsProps> = ({
     );
   }
 
-  if (!searchResults || searchResults.length === 0) {
+  // Handle different data structures and null/undefined cases
+  const results = Array.isArray(searchResults) ? searchResults : [];
+  const hasResults = results.length > 0;
+
+  if (!hasResults) {
     return (
       <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
         <CardHeader>
@@ -59,13 +64,19 @@ const WebSearchResults: React.FC<WebSearchResultsProps> = ({
             Web Search Analysis
           </CardTitle>
           <CardDescription className="text-white/80">
-            No web search results available
+            {searchResults === null || searchResults === undefined 
+              ? "Web search in progress..." 
+              : "No web search results available"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-center py-4">
             <AlertTriangle className="h-8 w-8 text-yellow-400 mx-auto mb-2" />
-            <p className="text-white/60">No additional fact-checking sources found</p>
+            <p className="text-white/60">
+              {searchResults === null || searchResults === undefined 
+                ? "Searching for fact-checking sources..." 
+                : "No additional fact-checking sources found"}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -80,12 +91,12 @@ const WebSearchResults: React.FC<WebSearchResultsProps> = ({
           Web Search Analysis
         </CardTitle>
         <CardDescription className="text-white/80">
-          Found {searchResults.length} fact-checking sources
+          Found {results.length} fact-checking sources
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {searchResults.map((result, index) => (
+          {results.map((result, index) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, y: 20 }}
@@ -95,17 +106,17 @@ const WebSearchResults: React.FC<WebSearchResultsProps> = ({
             >
               <div className="flex items-start justify-between mb-2">
                 <h4 className="text-white font-semibold text-sm leading-tight flex-1 mr-2">
-                  {result.title}
+                  {result.title || 'No title available'}
                 </h4>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Badge 
                     variant="outline" 
                     className="text-xs border-white/30 text-white/80"
                   >
-                    {Math.round(result.relevance_score * 100)}% match
+                    {Math.round((result.relevance_score || 0) * 100)}% match
                   </Badge>
                   <a
-                    href={result.url}
+                    href={result.url || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-400 hover:text-blue-300 transition-colors"
@@ -116,14 +127,14 @@ const WebSearchResults: React.FC<WebSearchResultsProps> = ({
               </div>
               
               <p className="text-white/70 text-sm leading-relaxed mb-2">
-                {result.snippet}
+                {result.snippet || 'No snippet available'}
               </p>
               
               <div className="flex items-center gap-2 text-xs text-white/60">
                 <Globe className="h-3 w-3" />
-                <span>{result.source}</span>
+                <span>{result.source || 'Unknown source'}</span>
                 <div className="w-1 h-1 bg-white/40 rounded-full"></div>
-                <span>Relevance: {Math.round(result.relevance_score * 100)}%</span>
+                <span>Relevance: {Math.round((result.relevance_score || 0) * 100)}%</span>
               </div>
             </motion.div>
           ))}

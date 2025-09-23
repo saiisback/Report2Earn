@@ -13,6 +13,7 @@ from datetime import datetime
 from urllib.parse import quote_plus
 import re
 from dataclasses import dataclass
+from groq import Groq
 # Environment variables are loaded in the main verification system
 
 @dataclass
@@ -27,6 +28,15 @@ class WebSearchModule:
     def __init__(self, serpapi_key: Optional[str] = None):
         # Initialize SerpAPI key (passed from main system)
         self.serpapi_key = serpapi_key or os.getenv("SERPAPI_API_KEY")
+        
+        # Initialize Groq client for intelligent query generation
+        groq_key = os.getenv("GROQ_API_KEY")
+        if groq_key:
+            self.groq_client = Groq(api_key=groq_key)
+            print(f"✅ Groq client initialized for intelligent query generation")
+        else:
+            self.groq_client = None
+            print("⚠️ GROQ_API_KEY not found - will use basic query generation")
         
         print(f"🔍 WebSearchModule initialized with key: {bool(self.serpapi_key)}")
         if self.serpapi_key:
@@ -72,12 +82,12 @@ class WebSearchModule:
         
         # Remove duplicates and rank by relevance
         unique_results = self._deduplicate_results(all_results)
-        ranked_results = self._rank_results(unique_results)
+        ranked_results = self._rank_results(unique_results, content_text)
         
         print(f"📊 Total unique results: {len(ranked_results)}")
         if ranked_results:
             print(f"🔍 Top sources: {[r.source for r in ranked_results[:3]]}")
-        return ranked_results[:10]  # Return top 10 results
+        return ranked_results  # Return all results - no limit
     
     async def _search_serpapi(self, query: str) -> List[SearchResult]:
         """Search using SerpAPI"""
@@ -91,7 +101,9 @@ class WebSearchModule:
                     'engine': 'google',
                     'num': 10,
                     'gl': 'us',
-                    'hl': 'en'
+                    'hl': 'en',
+                    'safe': 'active',
+                    'google_domain': 'google.com'
                 }
                 
                 print(f"📡 Requesting: https://serpapi.com/search")
@@ -102,7 +114,26 @@ class WebSearchModule:
                     if response.status == 200:
                         data = await response.json()
                         print(f"✅ Received data with keys: {list(data.keys())}")
-                        return self._parse_serpapi_results(data)
+                        
+                        # Check for errors in response
+                        if 'error' in data:
+                            print(f"⚠️ SerpAPI error: {data['error']}")
+                            return []
+                        
+                        # Parse results
+                        results = self._parse_serpapi_results(data)
+                        print(f"✅ Query returned {len(results)} results")
+                        
+                        # Debug: Show first few results
+                        if results:
+                            print(f"🔍 Sample results:")
+                            for i, result in enumerate(results[:2], 1):
+                                print(f"   {i}. {result.title[:50]}...")
+                                print(f"      Source: {result.source}")
+                        else:
+                            print("⚠️ No results found for this query")
+                        
+                        return results
                     else:
                         error_text = await response.text()
                         print(f"❌ SerpAPI error: {response.status} - {error_text}")
@@ -119,14 +150,55 @@ class WebSearchModule:
         """Parse SerpAPI search results"""
         results = []
         
+        # Parse organic results - show all results
         if 'organic_results' in data:
             for item in data['organic_results']:
+                if item.get('title') and item.get('link'):  # Only basic validation
+                    result = SearchResult(
+                        title=item.get('title', ''),
+                        url=item.get('link', ''),
+                        snippet=item.get('snippet', ''),
+                        source=self._extract_domain(item.get('link', '')),
+                        relevance_score=0.8
+                    )
+                    results.append(result)
+        
+        # Parse news results if available
+        if 'news_results' in data:
+            for item in data['news_results']:
+                if item.get('title') and item.get('link'):  # Only basic validation
+                    result = SearchResult(
+                        title=item.get('title', ''),
+                        url=item.get('link', ''),
+                        snippet=item.get('snippet', ''),
+                        source=self._extract_domain(item.get('link', '')),
+                        relevance_score=0.9  # Higher score for news
+                    )
+                    results.append(result)
+        
+        # Parse answer box if available
+        if 'answer_box' in data:
+            answer_box = data['answer_box']
+            if answer_box.get('answer'):
                 result = SearchResult(
-                    title=item.get('title', ''),
-                    url=item.get('link', ''),
-                    snippet=item.get('snippet', ''),
-                    source='SerpAPI',
-                    relevance_score=0.8
+                    title=answer_box.get('title', 'Answer'),
+                    url=answer_box.get('link', ''),
+                    snippet=answer_box.get('answer', ''),
+                    source=self._extract_domain(answer_box.get('link', '')),
+                    relevance_score=1.0  # Highest score for direct answers
+                )
+                results.append(result)
+        
+        # Parse knowledge graph if available
+        if 'knowledge_graph' in data:
+            kg = data['knowledge_graph']
+            if kg.get('description'):
+                result = SearchResult(
+                    title=kg.get('title', 'Knowledge Graph'),
+                    url=kg.get('website', ''),
+                    snippet=kg.get('description', ''),
+                    source=self._extract_domain(kg.get('website', '')),
+                    relevance_score=0.9  # High score for knowledge graph
                 )
                 results.append(result)
         
@@ -134,62 +206,93 @@ class WebSearchModule:
     
     
     def _generate_search_queries(self, content_text: str, content_url: str = "") -> List[str]:
-        """Generate fact-checking focused search queries from content text"""
+        """Generate intelligent fact-checking search queries using Groq LLM"""
         
-        # Extract key phrases and entities
-        key_phrases = self._extract_key_phrases(content_text)
-        claims = self._extract_claims(content_text)
-        topics = self._extract_topics(content_text)
-        
+        if self.groq_client:
+            return self._generate_llm_queries(content_text, content_url)
+        else:
+            return self._generate_basic_queries(content_text, content_url)
+    
+    def _generate_llm_queries(self, content_text: str, content_url: str = "") -> List[str]:
+        """Generate search queries using Groq LLM (Llama-3.1-8b-instant)"""
+        try:
+            print("🤖 Generating intelligent search queries with Groq...")
+            
+            prompt = f"""
+Generate 8-10 search queries to find information about this content:
+
+Content: "{content_text[:200]}"
+
+Create diverse search queries that will find:
+- News articles
+- Official statements
+- Fact-checking information
+- Expert opinions
+- Recent updates
+- Background information
+
+Make queries simple and broad. Use quotes only for exact phrases.
+Search everywhere - no restrictions.
+
+Return only the search queries, one per line.
+"""
+
+            response = self.groq_client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {"role": "system", "content": "You are a fact-checking expert who generates precise search queries for verification."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500,
+                temperature=0.3
+            )
+            
+            # Parse the response
+            queries_text = response.choices[0].message.content.strip()
+            queries = [q.strip() for q in queries_text.split('\n') if q.strip()]
+            
+            # Filter and clean queries
+            clean_queries = []
+            for query in queries:
+                if len(query) > 10 and len(query) < 200:  # Reasonable length
+                    # Remove any numbering or bullets
+                    query = re.sub(r'^\d+\.\s*', '', query)
+                    query = re.sub(r'^[-*]\s*', '', query)
+                    clean_queries.append(query)
+            
+            print(f"✅ Generated {len(clean_queries)} intelligent queries")
+            for i, query in enumerate(clean_queries[:3], 1):
+                print(f"   {i}. {query[:60]}...")
+            
+            return clean_queries[:10]  # Return top 10 queries
+            
+        except Exception as e:
+            print(f"❌ Error generating LLM queries: {e}")
+            print("🔄 Falling back to basic query generation...")
+            return self._generate_basic_queries(content_text, content_url)
+    
+    def _generate_basic_queries(self, content_text: str, content_url: str = "") -> List[str]:
+        """Fallback basic query generation"""
         queries = []
         
-        # 1. Direct fact-check queries with reliable sources
+        # Basic fact-check queries
         if content_text:
-            # Clean and truncate content for search
             clean_text = re.sub(r'[^\w\s]', ' ', content_text)
-            clean_text = ' '.join(clean_text.split()[:15])  # First 15 words
+            clean_text = ' '.join(clean_text.split()[:15])
             
-            # Fact-check with reliable sources
-            queries.append(f'"{clean_text}" site:snopes.com')
-            queries.append(f'"{clean_text}" site:politifact.com')
-            queries.append(f'"{clean_text}" site:reuters.com')
-            queries.append(f'"{clean_text}" site:bbc.com')
-            queries.append(f'"{clean_text}" site:apnews.com')
-            queries.append(f'"{clean_text}" fact check')
-            queries.append(f'"{clean_text}" verification')
+            # Generate simple, broad queries
+            queries.extend([
+                clean_text,  # Direct search
+                f'{clean_text} news',
+                f'{clean_text} facts',
+                f'{clean_text} information',
+                f'{clean_text} latest',
+                f'{clean_text} 2024',
+                f'{clean_text} official',
+                f'{clean_text} government'
+            ])
         
-        # 2. Key phrases with fact-checking focus
-        for phrase in key_phrases[:3]:
-            if len(phrase) > 10:  # Only use substantial phrases
-                queries.append(f'"{phrase}" fact check snopes politifact')
-                queries.append(f'"{phrase}" verification reuters bbc')
-                queries.append(f'"{phrase}" true false')
-        
-        # 3. Claims-based queries with reliable sources
-        for claim in claims[:2]:
-            if len(claim) > 15:  # Substantial claims only
-                queries.append(f'"{claim}" site:snopes.com')
-                queries.append(f'"{claim}" site:politifact.com')
-                queries.append(f'"{claim}" fact check verification')
-                queries.append(f'"{claim}" reuters bbc ap news')
-        
-        # 4. Topic-based verification queries
-        for topic in topics[:2]:
-            if len(topic) > 10:
-                queries.append(f'"{topic}" latest news verification')
-                queries.append(f'"{topic}" fact check')
-        
-        # 5. Source verification queries
-        if content_url:
-            domain = self._extract_domain(content_url)
-            if domain:
-                queries.append(f'"{domain}" credibility reputation fact check')
-        
-        # Remove duplicates and empty queries
-        queries = list(set([q for q in queries if q.strip()]))
-        
-        print(f"🔍 Generated {len(queries)} search queries")
-        return queries
+        return queries[:8]
     
     def _extract_key_phrases(self, text: str) -> List[str]:
         """Extract key phrases from text"""
@@ -257,55 +360,6 @@ class WebSearchModule:
         
         return topics[:3]  # Top 3 topics
     
-    def _rank_results(self, results: List[SearchResult]) -> List[SearchResult]:
-        """Rank search results by reliability and relevance"""
-        # Reliable sources get higher priority
-        reliable_domains = {
-            'snopes.com': 1.0,
-            'politifact.com': 1.0,
-            'reuters.com': 0.9,
-            'bbc.com': 0.9,
-            'apnews.com': 0.9,
-            'factcheck.org': 0.9,
-            'washingtonpost.com': 0.8,
-            'nytimes.com': 0.8,
-            'theguardian.com': 0.8,
-            'npr.org': 0.8,
-            'cbsnews.com': 0.7,
-            'abcnews.go.com': 0.7,
-            'cnn.com': 0.6,
-            'foxnews.com': 0.6,
-            'msnbc.com': 0.6
-        }
-        
-        for result in results:
-            # Base relevance score
-            relevance = result.relevance_score
-            
-            # Boost for reliable sources
-            domain = self._extract_domain(result.url)
-            if domain in reliable_domains:
-                relevance *= reliable_domains[domain]
-            
-            # Boost for fact-checking keywords
-            fact_keywords = ['fact check', 'verification', 'true', 'false', 'misinformation', 'debunked', 'verified']
-            title_lower = result.title.lower()
-            snippet_lower = result.snippet.lower()
-            
-            for keyword in fact_keywords:
-                if keyword in title_lower:
-                    relevance *= 1.2
-                if keyword in snippet_lower:
-                    relevance *= 1.1
-            
-            # Boost for recent content (if date available)
-            if '2024' in result.title or '2024' in result.snippet:
-                relevance *= 1.1
-            
-            result.relevance_score = relevance
-        
-        # Sort by relevance score
-        return sorted(results, key=lambda x: x.relevance_score, reverse=True)
     
     def _extract_domain(self, url: str) -> Optional[str]:
         """Extract domain from URL"""
@@ -329,22 +383,25 @@ class WebSearchModule:
         
         return unique_results
     
-    def _rank_results(self, results: List[SearchResult], content_text: str) -> List[SearchResult]:
+    def _rank_results(self, results: List[SearchResult], content_text: str = "") -> List[SearchResult]:
         """Rank results by relevance to content"""
         
         # Simple relevance scoring based on text similarity
-        content_words = set(content_text.lower().split())
+        content_words = set(content_text.lower().split()) if content_text else set()
         
         for result in results:
             # Calculate relevance score
             result_words = set((result.title + ' ' + result.snippet).lower().split())
             
-            # Word overlap score
-            overlap = len(content_words.intersection(result_words))
-            total_words = len(content_words.union(result_words))
-            
-            if total_words > 0:
-                overlap_score = overlap / total_words
+            # Word overlap score (only if content provided)
+            if content_words:
+                overlap = len(content_words.intersection(result_words))
+                total_words = len(content_words.union(result_words))
+                
+                if total_words > 0:
+                    overlap_score = overlap / total_words
+                else:
+                    overlap_score = 0
             else:
                 overlap_score = 0
             
