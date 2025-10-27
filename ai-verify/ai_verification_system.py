@@ -117,7 +117,7 @@ class AgenticVerificationSystem:
                 model="nvidia/nemotron-nano-9b-v2:free",
                 openai_api_base="https://openrouter.ai/api/v1",
                 openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-                temperature=0.7,
+                temperature=0,
                 timeout=30,
                 max_retries=2
             ),
@@ -125,7 +125,7 @@ class AgenticVerificationSystem:
                 model="z-ai/glm-4.5-air:free",
                 openai_api_base="https://openrouter.ai/api/v1",
                 openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-                temperature=0.7,
+                temperature=0,
                 timeout=30,
                 max_retries=2
             ),
@@ -133,7 +133,7 @@ class AgenticVerificationSystem:
                 model="mistralai/mistral-small-3.2-24b-instruct:free",
                 openai_api_base="https://openrouter.ai/api/v1",
                 openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-                temperature=0.7,
+                temperature=0,
                 timeout=30,
                 max_retries=2
             ),
@@ -141,7 +141,7 @@ class AgenticVerificationSystem:
                 model="cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
                 openai_api_base="https://openrouter.ai/api/v1",
                 openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-                temperature=0.7,
+                temperature=0,
                 timeout=30,
                 max_retries=2
             ),
@@ -149,7 +149,7 @@ class AgenticVerificationSystem:
                 model="moonshotai/kimi-dev-72b:free",
                 openai_api_base="https://openrouter.ai/api/v1",
                 openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-                temperature=0.7,
+                temperature=0,
                 timeout=30,
                 max_retries=2
             )
