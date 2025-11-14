@@ -16,7 +16,7 @@ jobs:
         working-directory: apps/report2earn/frontend
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -54,7 +54,7 @@ jobs:
         working-directory: apps/ai-verification-module
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -90,7 +90,7 @@ jobs:
         working-directory: apps/smart-contracts
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
