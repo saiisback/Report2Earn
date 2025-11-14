@@ -35,6 +35,6 @@
   },
   "homepage": "https://github.com/your-username/r2e#readme",
   "dependencies": {
-    "algosdk": "^3.4.0"
+    "algosdk": "^3.5.2"
   }
 }
