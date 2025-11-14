@@ -1,5 +1,12 @@
 {
+  "name": "@r2e/report2earn-smart-contracts",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "deploy": "npm run deploy --prefix ../../smart-contracts",
+    "deploy:creator": "npm run deploy:creator --prefix ../../smart-contracts"
+  },
   "dependencies": {
-    "algosdk": "^3.4.0"
+    "@r2e/smart-contracts": "file:../../smart-contracts"
   }
 }

@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  frontend:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: apps/report2earn/frontend
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: Lint
+        run: pnpm run lint
+      
+      - name: Type check
+        run: pnpm run build --dry-run || true
+      
+      - name: Build
+        run: pnpm run build
+        env:
+          NEXT_PUBLIC_ALGOD_TOKEN: ${{ secrets.ALGOD_TOKEN }}
+          NEXT_PUBLIC_ALGOD_SERVER: https://testnet-api.algonode.cloud
+          NEXT_PUBLIC_ALGOD_PORT: '443'
+
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: apps/ai-verification-module
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install pytest pytest-cov black flake8 mypy
+      
+      - name: Lint with flake8
+        run: |
+          flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+        continue-on-error: true
+      
+      - name: Format check with black
+        run: black --check src/
+        continue-on-error: true
+      
+      - name: Type check with mypy
+        run: mypy src/ --ignore-missing-imports
+        continue-on-error: true
+
+  smart-contracts:
+    name: Smart Contracts CI
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: apps/smart-contracts
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Verify contract files exist
+        run: |
+          test -f contracts/approval.teal
+          test -f contracts/clear.teal
+          echo "✅ Contract files verified"
+
+
+

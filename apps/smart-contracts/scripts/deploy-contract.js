@@ -1,13 +1,15 @@
 const algosdk = require('algosdk');
 const fs = require('fs');
+const path = require('path');
 
-
+const CONTRACTS_DIR = path.resolve(__dirname, '../contracts');
 const algodClient = new algosdk.Algodv2('', 'https://testnet-api.algonode.cloud', 443);
 
 async function deploy() {
   try {
     // Read account details from file
-    const accountDetails = JSON.parse(fs.readFileSync('account-details.json', 'utf8'));
+    const accountDetailsPath = path.join(CONTRACTS_DIR, 'account-details.json');
+    const accountDetails = JSON.parse(fs.readFileSync(accountDetailsPath, 'utf8'));
     const creator = algosdk.mnemonicToSecretKey(accountDetails.mnemonic);
     
     // Use the address directly from account details
@@ -27,8 +29,8 @@ async function deploy() {
     }
     
     // Read TEAL files
-    const approvalProgram = fs.readFileSync('approval.teal', 'utf8');
-    const clearProgram = fs.readFileSync('clear.teal', 'utf8');
+    const approvalProgram = fs.readFileSync(path.join(CONTRACTS_DIR, 'approval.teal'), 'utf8');
+    const clearProgram = fs.readFileSync(path.join(CONTRACTS_DIR, 'clear.teal'), 'utf8');
     
     // Compile programs
     const compiledApproval = await algodClient.compile(approvalProgram).do();
@@ -89,7 +91,7 @@ async function deploy() {
       // Update account details with App ID
       if (appId) {
         accountDetails.appId = Number(appId);
-        fs.writeFileSync('account-details.json', JSON.stringify(accountDetails, null, 2));
+        fs.writeFileSync(accountDetailsPath, JSON.stringify(accountDetails, null, 2));
         console.log('\nApp ID saved to account-details.json');
       } else {
         console.log('\n⚠️  Warning: App ID not found in confirmed transaction');

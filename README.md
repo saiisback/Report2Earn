@@ -1,6 +1,13 @@
 # R2E - Report to Earn: Decentralized Misinformation Detection Platform
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Contributors Welcome](https://img.shields.io/badge/contributors-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Code of Conduct](https://img.shields.io/badge/code%20of%20conduct-Contributor%20Covenant-ff69b4.svg)](CODE_OF_CONDUCT.md)
+[![CI](https://github.com/your-username/r2e/workflows/CI/badge.svg)](https://github.com/your-username/r2e/actions)
+
 A comprehensive Web3 platform that incentivizes users to report and verify misinformation through AI-powered content analysis, blockchain-based rewards, and community-driven verification.
+
+> **Note**: This project is open source and welcomes contributions! See our [Contributing Guide](CONTRIBUTING.md) to get started.
 
 ## Table of Contents
 
@@ -81,35 +88,19 @@ R2E (Report to Earn) is a decentralized platform that combats misinformation by 
 ## Project Structure
 
 ```
-r2e/
-├── ai-verify/                    # AI Verification Backend
-│   ├── main.py                   # FastAPI server entry point
-│   ├── ai_verification_system.py # Multi-agent AI system
-│   ├── content_scraper.py        # Social media content scraper
-│   ├── image_processor.py        # Image analysis and processing
-│   ├── requirements.txt          # Python dependencies
-│   ├── Dockerfile               # Container configuration
-│   └── nixpacks.toml           # Deployment configuration
-├── frontend/                     # Next.js Web Application
-│   ├── app/                     # App Router pages
-│   │   ├── page.tsx            # Landing page
-│   │   ├── verify/             # Verification interface
-│   │   └── community/          # Community dashboard
-│   ├── components/             # React components
-│   │   ├── ui/                 # Reusable UI components
-│   │   ├── SmartContractVerificationFlow.tsx
-│   │   ├── Leaderboard.tsx
-│   │   └── RandomLiveFeed.tsx
-│   ├── contexts/               # React contexts
-│   ├── hooks/                  # Custom React hooks
-│   ├── lib/                    # Utility functions
-│   └── config/                 # Configuration files
-├── smart-contracts/            # Algorand Smart Contracts
-│   ├── approval.teal          # Main contract logic
-│   ├── clear.teal             # Contract cleanup
-│   ├── deploy-contract.js     # Deployment script
-│   └── deploy-creator.js      # Creator account setup
-└── README.md                   # This file
+apps/
+├── ai-verification-module/       # Reusable Python package for AI verification
+│   ├── src/r2e_ai_verification/  # Core system, API factory, CLI
+│   └── pyproject.toml            # Package metadata
+├── report2earn/                  # Application bundle that wires modules together
+│   ├── ai-verify/                # FastAPI entrypoint that imports the shared module
+│   ├── frontend/                 # Next.js web application
+│   └── smart-contracts/          # Wrapper that links to the shared contracts package
+├── smart-contracts/              # Shared Algorand contracts (TEAL + scripts)
+│   ├── contracts/                # approval.teal, clear.teal, account metadata
+│   └── scripts/                  # Deployment utilities
+├── pnpm-workspace.yaml           # Workspace linking Node packages
+└── README.md
 ```
 
 ## Features
@@ -119,6 +110,7 @@ r2e/
 - **AI-Powered Analysis**: 5 different AI models working in consensus
 - **Dynamic Reward System**: Rewards based on content popularity and verification accuracy
 - **Blockchain Integration**: Transparent reward distribution via Algorand smart contracts
+- **DAO Governance**: Decentralized community decision-making through proposals and voting
 - **Real-time Processing**: Fast content analysis and verification
 - **Community Dashboard**: Leaderboards and community statistics
 
@@ -142,41 +134,45 @@ r2e/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/r2e.git
-   cd r2e
+   git clone https://github.com/your-username/report2earn.git
+   cd report2earn
    ```
 
 2. **Install Frontend Dependencies**
    ```bash
-   cd frontend
-   npm install
-   # or
-   pnpm install
+   cd apps/report2earn/frontend
+   pnpm install   # npm install also works
    ```
 
-3. **Install Backend Dependencies**
+3. **Install the Shared AI Verification Module**
    ```bash
-   cd ../ai-verify
+   cd ../../ai-verification-module
+   pip install -e .
+   ```
+
+4. **Install Backend Service Dependencies**
+   ```bash
+   cd ../report2earn/ai-verify
    pip install -r requirements.txt
    ```
 
-4. **Install Smart Contract Dependencies**
+5. **Install Smart Contract Dependencies**
    ```bash
-   cd ../smart-contracts
-   npm install
+   cd ../../smart-contracts
+   pnpm install   # npm install also works
    ```
 
 ### Environment Setup
 
 1. **Backend Environment Variables**
-   Create `ai-verify/.env`:
+   Create `apps/report2earn/ai-verify/.env`:
    ```env
    OPENROUTER_API_KEY=your_openrouter_api_key
    GROQ_API_KEY=your_groq_api_key
    ```
 
 2. **Frontend Environment Variables**
-   Create `frontend/.env.local`:
+   Create `apps/report2earn/frontend/.env.local`:
    ```env
    NEXT_PUBLIC_ALGOD_TOKEN=your_algod_token
    NEXT_PUBLIC_ALGOD_SERVER=https://testnet-api.algonode.cloud
@@ -185,7 +181,7 @@ r2e/
    ```
 
 3. **Smart Contract Configuration**
-   Create `smart-contracts/.env`:
+   Create `apps/smart-contracts/.env`:
    ```env
    ALGOD_TOKEN=your_algod_token
    ALGOD_SERVER=https://testnet-api.algonode.cloud
@@ -196,14 +192,14 @@ r2e/
 
 1. **Start the AI Verification Backend**
    ```bash
-   cd ai-verify
-   python main.py
+   cd apps/report2earn/ai-verify
+   python main.py  # or: r2e-ai-verification --reload
    ```
    Server runs on `http://localhost:8000`
 
 2. **Start the Frontend Development Server**
    ```bash
-   cd frontend
+   cd apps/report2earn/frontend
    npm run dev
    # or
    pnpm dev
@@ -212,8 +208,8 @@ r2e/
 
 3. **Deploy Smart Contracts** (Optional for development)
    ```bash
-   cd smart-contracts
-   node deploy-contract.js
+   cd apps/smart-contracts
+   pnpm run deploy
    ```
 
 ## Deployment
@@ -222,7 +218,7 @@ r2e/
 
 1. **Connect to Vercel**
    ```bash
-   cd frontend
+   cd apps/report2earn/frontend
    vercel login
    vercel --prod
    ```
@@ -237,7 +233,7 @@ r2e/
 
 1. **Using Railway**
    ```bash
-   cd ai-verify
+   cd apps/report2earn/ai-verify
    railway login
    railway init
    railway up
@@ -245,7 +241,7 @@ r2e/
 
 2. **Using Render**
    - Connect GitHub repository
-   - Set build command: `pip install -r requirements.txt`
+   - Set build command: `pip install -e ../ai-verification-module && pip install -r requirements.txt`
    - Set start command: `python main.py`
    - Add environment variables
 
@@ -253,8 +249,8 @@ r2e/
 
 1. **Deploy to Algorand Testnet**
    ```bash
-   cd smart-contracts
-   node deploy-contract.js
+   cd apps/smart-contracts
+   pnpm run deploy
    ```
 
 2. **Deploy to Algorand Mainnet**
@@ -388,26 +384,69 @@ GET /agents
 ## Smart Contracts
 
 ### Contract Overview
-The R2E smart contract manages reward distribution and user opt-in functionality on the Algorand blockchain.
+The shared package in `apps/smart-contracts` exposes TEAL programs and deployment scripts used across applications. The platform includes two main contracts:
 
-### Key Features
+1. **Reward Contract**: Manages verification fees and reward distribution
+2. **DAO Governance Contract**: Enables decentralized community decision-making
+
+### Reward Contract
+
+#### Key Features
 - **User Opt-in**: Users must opt into the contract to claim rewards
 - **One-time Claims**: Each user can claim rewards only once
 - **Automatic Distribution**: Contract automatically sends ALGO to users
 - **Creator Control**: Only contract creator can update/delete contract
 
-### Contract Functions
+#### Contract Functions
 - `opt_in()`: User opts into the contract
 - `claim_reward()`: User claims their reward
 - `update_contract()`: Creator updates contract (admin only)
 - `delete_contract()`: Creator deletes contract (admin only)
 
+### DAO Governance Contract
+
+#### Key Features
+- **Proposal Creation**: Community members can create governance proposals with deposits
+- **Voting Mechanism**: Yes/No/Abstain voting on active proposals
+- **Quorum Requirements**: Ensures meaningful participation (default: 50%)
+- **Time-based Voting**: Fixed voting periods prevent manipulation (~7 days)
+- **Proposal Execution**: Automatic execution of passed proposals
+
+#### Governance Parameters
+- **Voting Period**: 10000 rounds (~7 days)
+- **Quorum Threshold**: 50% (configurable)
+- **Min Proposal Deposit**: 10 ALGO (prevents spam)
+
+#### Use Cases
+- Reward pool management
+- Feature proposals
+- Parameter updates
+- Treasury management
+- Community initiatives
+
+For detailed DAO documentation, see [apps/smart-contracts/docs/DAO.md](apps/smart-contracts/docs/DAO.md).
+
 ### Deployment Process
+
+#### Reward Contract
+```bash
+cd apps/smart-contracts
+npm run deploy
+```
+
+#### DAO Contract
+```bash
+cd apps/smart-contracts
+npm run deploy:dao
+```
+
+#### Deployment Steps
 1. Compile TEAL programs
 2. Create application transaction
 3. Sign and submit transaction
 4. Wait for confirmation
 5. Extract application ID
+6. Initialize contract parameters (for DAO)
 
 ## Frontend
 
@@ -510,18 +549,36 @@ The popularity multiplier is calculated using:
 
 ## Contributing
 
-### Development Setup
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- How to set up your development environment
+- Our coding standards and conventions
+- How to submit pull requests
+- Our issue and PR templates
+
+Please also read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
+
+### Quick Start for Contributors
+
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+2. Clone your fork: `git clone https://github.com/your-username/r2e.git`
+3. Create a feature branch: `git checkout -b feature/your-feature-name`
+4. Make your changes and test them
+5. Commit using [Conventional Commits](https://www.conventionalcommits.org/): `git commit -m "feat: add your feature"`
+6. Push to your fork: `git push origin feature/your-feature-name`
+7. Open a Pull Request
+
+For more details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Security
+
+For security concerns, please see our [Security Policy](SECURITY.md). **Do not** report security vulnerabilities through public GitHub issues.
 
 ## Support
 

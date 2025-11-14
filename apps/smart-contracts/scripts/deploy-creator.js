@@ -1,6 +1,9 @@
 // deploy-manual.js
 const algosdk = require('algosdk');
 const fs = require('fs');
+const path = require('path');
+
+const CONTRACTS_DIR = path.resolve(__dirname, '../contracts');
 
 // Algorand client
 const algodClient = new algosdk.Algodv2('', 'https://testnet-api.algonode.cloud', 443);
@@ -8,8 +11,8 @@ const algodClient = new algosdk.Algodv2('', 'https://testnet-api.algonode.cloud'
 async function deploy() {
   try {
     // Read TEAL files
-    const approvalProgram = fs.readFileSync('approval.teal', 'utf8');
-    const clearProgram = fs.readFileSync('clear.teal', 'utf8');
+    const approvalProgram = fs.readFileSync(path.join(CONTRACTS_DIR, 'approval.teal'), 'utf8');
+    const clearProgram = fs.readFileSync(path.join(CONTRACTS_DIR, 'clear.teal'), 'utf8');
     
     // Compile programs
     const compiledApproval = await algodClient.compile(approvalProgram).do();
@@ -38,7 +41,7 @@ async function deploy() {
       mnemonic: mnemonic
     };
     
-    fs.writeFileSync('account-details.json', JSON.stringify(accountDetails, null, 2));
+    fs.writeFileSync(path.join(CONTRACTS_DIR, 'account-details.json'), JSON.stringify(accountDetails, null, 2));
     console.log('\nAccount details saved to account-details.json');
     
   } catch (error) {

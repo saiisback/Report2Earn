@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "r2e-ai-verification"
+version = "0.1.0"
+description = "Modular agentic AI verification system used by Report2Earn"
+readme = "README.md"
+authors = [
+  { name = "R2E Team", email = "team@report2earn.com" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.9"
+keywords = ["ai", "verification", "fact-checking", "misinformation", "langchain", "langgraph"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "langgraph>=0.2.0",
+  "langchain>=0.3.0",
+  "langchain-openai>=0.2.0",
+  "langchain-core>=0.3.0",
+  "httpx>=0.27.0",
+  "pydantic>=2.0.0",
+  "typing-extensions>=4.0.0",
+  "fastapi>=0.104.0",
+  "uvicorn>=0.24.0",
+  "python-dotenv>=1.0.0",
+  "requests>=2.31.0",
+  "selenium>=4.15.0",
+  "webdriver-manager>=4.0.0",
+  "beautifulsoup4>=4.12.0",
+  "groq>=0.4.0",
+  "Pillow>=10.0.0",
+  "aiohttp>=3.8.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "httpx[cli]"
+]
+
+[project.scripts]
+r2e-ai-verification = "r2e_ai_verification.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

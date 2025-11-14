@@ -1,0 +1,9 @@
+#pragma version 6
+
+// Clear state program for DAO governance contract
+// Allows users to clear their local state (voting records)
+
+// Always approve clear state
+int 1
+return
+

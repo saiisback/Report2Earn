@@ -21,9 +21,9 @@ import httpx
 from dotenv import load_dotenv
 
 # Import our custom modules
-from image_processor import ImageProcessor
-from content_scraper import ContentScraper
-from web_search_module import WebSearchModule
+from .image_processor import ImageProcessor
+from .content_scraper import ContentScraper
+from .web_search import WebSearchModule
 
 # Load environment variables
 load_dotenv()

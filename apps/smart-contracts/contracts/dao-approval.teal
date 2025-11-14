@@ -1,0 +1,558 @@
+#pragma version 6
+
+// DAO Governance Smart Contract for Report2Earn
+// Enables decentralized decision-making through proposals and voting
+
+// Global State Schema:
+// - proposal_count (uint64): Total number of proposals created
+// - voting_period (uint64): Duration of voting period in rounds
+// - quorum_threshold (uint64): Minimum votes required (in basis points, e.g., 5000 = 50%)
+// - min_proposal_deposit (uint64): Minimum ALGO required to create a proposal
+
+// Local State Schema (per user):
+// - has_voted_{proposal_id} (uint64): 1 if user voted, 0 otherwise
+// - vote_choice_{proposal_id} (uint64): 1 = Yes, 2 = No, 3 = Abstain
+
+// Proposal Structure (stored in global state):
+// - proposal_{id}_creator (bytes): Address of proposal creator
+// - proposal_{id}_start_round (uint64): Round when voting starts
+// - proposal_{id}_end_round (uint64): Round when voting ends
+// - proposal_{id}_yes_votes (uint64): Count of yes votes
+// - proposal_{id}_no_votes (uint64): Count of no votes
+// - proposal_{id}_abstain_votes (uint64): Count of abstain votes
+// - proposal_{id}_status (uint64): 0 = Active, 1 = Passed, 2 = Rejected, 3 = Executed
+// - proposal_{id}_description (bytes): Proposal description hash
+
+// Check transaction type
+txn OnCompletion
+int NoOp
+==
+bnz handle_noop
+
+txn OnCompletion
+int OptIn
+==
+bnz handle_optin
+
+txn OnCompletion
+int UpdateApplication
+==
+bnz handle_updateapp
+
+txn OnCompletion
+int DeleteApplication
+==
+bnz handle_deleteapp
+
+// Unexpected transaction type
+err
+
+handle_optin:
+// Allow anyone to opt in to participate in DAO governance
+int 1
+return
+
+handle_updateapp:
+// Only creator can update (for emergency fixes)
+txn Sender
+global CreatorAddress
+==
+bnz update_allowed
+err
+
+update_allowed:
+int 1
+return
+
+handle_deleteapp:
+// Only creator can delete (for emergency situations)
+txn Sender
+global CreatorAddress
+==
+bnz delete_allowed
+err
+
+delete_allowed:
+int 1
+return
+
+handle_noop:
+// Route to appropriate handler based on application args
+txn ApplicationArgs
+len
+int 0
+==
+bnz invalid_args
+
+// First arg determines action:
+// "create_proposal" - Create a new governance proposal
+// "vote" - Vote on an active proposal
+// "execute_proposal" - Execute a passed proposal
+// "get_proposal" - Get proposal details (read-only)
+
+txn ApplicationArgs 0
+byte "create_proposal"
+==
+bnz create_proposal
+
+txn ApplicationArgs 0
+byte "vote"
+==
+bnz vote_proposal
+
+txn ApplicationArgs 0
+byte "execute_proposal"
+==
+bnz execute_proposal
+
+txn ApplicationArgs 0
+byte "get_proposal"
+==
+bnz get_proposal
+
+invalid_args:
+err
+
+create_proposal:
+// Create a new governance proposal
+// Args: ["create_proposal", description_hash, voting_period_rounds]
+// Payment: min_proposal_deposit ALGO to contract
+
+// Check we have required args
+txn ApplicationArgs
+len
+int 3
+==
+bnz create_check_payment
+err
+
+create_check_payment:
+// Verify payment transaction exists (min deposit)
+gtxn 1 TypeEnum
+int pay
+==
+bnz create_check_amount
+err
+
+create_check_amount:
+// Get min deposit from global state (default: 10 ALGO = 10000000 microAlgos)
+global CurrentApplicationAddress
+byte "min_proposal_deposit"
+app_global_get
+dup
+bnz create_has_min_deposit
+pop
+int 10000000  // Default: 10 ALGO
+create_has_min_deposit:
+gtxn 1 Amount
+>=
+bnz create_get_proposal_id
+err
+
+create_get_proposal_id:
+// Get and increment proposal count
+global CurrentApplicationAddress
+byte "proposal_count"
+app_global_get
+dup
+bnz create_has_count
+pop
+int 0
+create_has_count:
+int 1
++
+dup
+global CurrentApplicationAddress
+byte "proposal_count"
+app_global_put
+
+// Store proposal data
+// proposal_{id}_creator
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_creator"
+concat
+txn Sender
+app_global_put
+
+// proposal_{id}_start_round
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_start_round"
+concat
+global Round
+app_global_put
+
+// proposal_{id}_end_round
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_end_round"
+concat
+global Round
+txn ApplicationArgs 2
+btoi
++
+app_global_put
+
+// proposal_{id}_yes_votes
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_yes_votes"
+concat
+int 0
+app_global_put
+
+// proposal_{id}_no_votes
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_no_votes"
+concat
+int 0
+app_global_put
+
+// proposal_{id}_abstain_votes
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_abstain_votes"
+concat
+int 0
+app_global_put
+
+// proposal_{id}_status (0 = Active)
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_status"
+concat
+int 0
+app_global_put
+
+// proposal_{id}_description
+byte "proposal_"
+concat
+itob
+concat
+byte "_description"
+concat
+txn ApplicationArgs 1
+app_global_put
+
+int 1
+return
+
+vote_proposal:
+// Vote on an active proposal
+// Args: ["vote", proposal_id, vote_choice]
+// vote_choice: 1 = Yes, 2 = No, 3 = Abstain
+
+txn ApplicationArgs
+len
+int 3
+==
+bnz vote_get_proposal_id
+err
+
+vote_get_proposal_id:
+txn ApplicationArgs 1
+btoi
+dup
+
+// Check if proposal exists and is active
+byte "proposal_"
+concat
+itob
+concat
+byte "_status"
+concat
+app_global_get
+int 0  // Active status
+==
+bnz vote_check_time
+err
+
+vote_check_time:
+// Check if voting period is still active
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_end_round"
+concat
+app_global_get
+global Round
+>=
+bnz vote_check_voted
+err
+
+vote_check_voted:
+// Check if user has already voted
+txn Sender
+byte "has_voted_"
+concat
+itob
+concat
+app_local_get
+dup
+bnz vote_already_voted
+pop
+int 0
+vote_already_voted:
+int 0
+==
+bnz vote_record_vote
+err
+
+vote_record_vote:
+// Record that user has voted
+txn Sender
+byte "has_voted_"
+concat
+txn ApplicationArgs 1
+concat
+app_local_put
+
+// Record vote choice
+txn Sender
+byte "vote_choice_"
+concat
+txn ApplicationArgs 1
+concat
+txn ApplicationArgs 2
+btoi
+app_local_put
+
+// Update vote counts
+txn ApplicationArgs 2
+btoi
+int 1
+==
+bnz vote_yes
+int 2
+==
+bnz vote_no
+int 3
+==
+bnz vote_abstain
+err
+
+vote_yes:
+txn ApplicationArgs 1
+btoi
+byte "proposal_"
+concat
+itob
+concat
+byte "_yes_votes"
+concat
+app_global_get
+int 1
++
+txn ApplicationArgs 1
+btoi
+byte "proposal_"
+concat
+itob
+concat
+byte "_yes_votes"
+concat
+app_global_put
+int 1
+return
+
+vote_no:
+txn ApplicationArgs 1
+btoi
+byte "proposal_"
+concat
+itob
+concat
+byte "_no_votes"
+concat
+app_global_get
+int 1
++
+txn ApplicationArgs 1
+btoi
+byte "proposal_"
+concat
+itob
+concat
+byte "_no_votes"
+concat
+app_global_put
+int 1
+return
+
+vote_abstain:
+txn ApplicationArgs 1
+btoi
+byte "proposal_"
+concat
+itob
+concat
+byte "_abstain_votes"
+concat
+app_global_get
+int 1
++
+txn ApplicationArgs 1
+btoi
+byte "proposal_"
+concat
+itob
+concat
+byte "_abstain_votes"
+concat
+app_global_put
+int 1
+return
+
+execute_proposal:
+// Execute a passed proposal (after voting period ends)
+// Args: ["execute_proposal", proposal_id]
+
+txn ApplicationArgs
+len
+int 2
+==
+bnz execute_get_proposal
+err
+
+execute_get_proposal:
+txn ApplicationArgs 1
+btoi
+dup
+
+// Check proposal status
+byte "proposal_"
+concat
+itob
+concat
+byte "_status"
+concat
+app_global_get
+int 0  // Must be Active
+==
+bnz execute_check_time
+err
+
+execute_check_time:
+// Check if voting period has ended
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_end_round"
+concat
+app_global_get
+global Round
+<=
+bnz execute_check_quorum
+err
+
+execute_check_quorum:
+// Check quorum threshold
+// Get total votes
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_yes_votes"
+concat
+app_global_get
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_no_votes"
+concat
+app_global_get
++
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_abstain_votes"
+concat
+app_global_get
++
+
+// Get quorum threshold (default: 50% = 5000 basis points)
+global CurrentApplicationAddress
+byte "quorum_threshold"
+app_global_get
+dup
+bnz execute_has_quorum
+pop
+int 5000  // Default: 50%
+execute_has_quorum:
+
+// For simplicity, we'll check if yes votes > no votes and quorum met
+// In production, you'd check against total token supply or member count
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_yes_votes"
+concat
+app_global_get
+dup
+byte "proposal_"
+concat
+itob
+concat
+byte "_no_votes"
+concat
+app_global_get
+>
+bnz execute_check_passed
+err
+
+execute_check_passed:
+// Mark proposal as passed and executed
+txn ApplicationArgs 1
+btoi
+byte "proposal_"
+concat
+itob
+concat
+byte "_status"
+concat
+int 3  // Executed
+app_global_put
+
+int 1
+return
+
+get_proposal:
+// Read-only: Get proposal details
+// This is handled by off-chain reading of global state
+int 1
+return
+

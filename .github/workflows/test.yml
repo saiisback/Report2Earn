@@ -1,0 +1,75 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test-contracts:
+    name: Test Smart Contracts
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: apps/smart-contracts
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Verify contract files
+        run: |
+          test -f contracts/approval.teal && echo "✅ Reward contract found"
+          test -f contracts/clear.teal && echo "✅ Clear state found"
+          test -f contracts/dao-approval.teal && echo "✅ DAO contract found"
+          test -f contracts/dao-clear.teal && echo "✅ DAO clear state found"
+          test -f scripts/deploy-contract.js && echo "✅ Deploy script found"
+          test -f scripts/deploy-dao.js && echo "✅ DAO deploy script found"
+          test -f scripts/dao-interactions.js && echo "✅ DAO interactions found"
+      
+      - name: Check syntax
+        run: |
+          node -c scripts/deploy-contract.js
+          node -c scripts/deploy-dao.js
+          node -c scripts/dao-interactions.js
+          echo "✅ All scripts syntax valid"
+
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: apps/ai-verification-module
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install pytest pytest-cov
+      
+      - name: Verify module structure
+        run: |
+          test -f src/r2e_ai_verification/__init__.py && echo "✅ Module init found"
+          test -f src/r2e_ai_verification/api.py && echo "✅ API module found"
+          test -f src/r2e_ai_verification/system.py && echo "✅ System module found"
+          python -c "import r2e_ai_verification; print('✅ Module imports successfully')"
+

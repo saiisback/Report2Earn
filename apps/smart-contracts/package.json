@@ -1,0 +1,40 @@
+{
+  "name": "@r2e/smart-contracts",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Reusable Algorand smart contract scripts and TEAL programs for Report2Earn",
+  "main": "scripts/deploy-contract.js",
+  "scripts": {
+    "deploy": "node scripts/deploy-contract.js",
+    "deploy:creator": "node scripts/deploy-creator.js",
+    "deploy:dao": "node scripts/deploy-dao.js",
+    "dao:interact": "node scripts/dao-interactions.js",
+    "lint": "echo 'No lint step configured'"
+  },
+  "files": [
+    "contracts",
+    "scripts"
+  ],
+  "keywords": [
+    "algorand",
+    "smart-contracts",
+    "r2e",
+    "blockchain",
+    "web3",
+    "teal"
+  ],
+  "author": "R2E Team <team@report2earn.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/r2e.git",
+    "directory": "apps/smart-contracts"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/r2e/issues"
+  },
+  "homepage": "https://github.com/your-username/r2e#readme",
+  "dependencies": {
+    "algosdk": "^3.4.0"
+  }
+}
